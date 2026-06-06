@@ -236,7 +236,6 @@
     <div class="main-layout">
         <div class="sidebar">
             <button class="nav-btn active" onclick="sayfaGoster('pos')"><i class="ti ti-shopping-cart"></i><span> SATIŞ</span></button>
-            <button class="nav-btn" onclick="sayfaGoster('iade')"><i class="ti ti-rotate-left"></i><span> İADE</span></button>
             <button class="nav-btn" onclick="sayfaGoster('vardiya')"><i class="ti ti-users"></i><span> VARDİYA</span></button>
             <button class="nav-btn" onclick="adminPanelAc()"><i class="ti ti-lock"></i><span> ADMIN</span></button>
         </div>
@@ -276,11 +275,7 @@
                 </div>
             </div>
 
-            <div class="page" id="page-iade">
-                <h3 style="font-size: 18px; margin-bottom: 12px;">↩️ SATIŞ İADE</h3>
-                <input type="text" id="iadeAra" placeholder="🔍 Fiş no veya ürün adı ara..." style="width:100%; padding: 14px; border: 1px solid #cbd5e1; border-radius: 12px; margin-bottom: 12px;" oninput="iadeAramaYapListe()">
-                <div id="iadeSatisListesiPage" style="max-height: 500px; overflow-y: auto;"></div>
-            </div>
+            <div class="page" id="page-iade" style="display:none!important;"></div>
 
             <div class="page" id="page-vardiya">
                 <div id="aktifVardiyaBilgi" class="alert alert-warning" style="margin-bottom: 16px;"></div>
@@ -314,7 +309,6 @@
 
     <div class="mobile-bottom-nav">
         <button class="mobile-nav-btn active" onclick="sayfaGosterMobil('pos')"><i class="ti ti-shopping-cart"></i><span>SATIŞ</span></button>
-        <button class="mobile-nav-btn" onclick="sayfaGosterMobil('iade')"><i class="ti ti-rotate-left"></i><span>İADE</span></button>
         <button class="mobile-nav-btn" onclick="sayfaGosterMobil('vardiya')"><i class="ti ti-users"></i><span>VARDİYA</span></button>
         <button class="mobile-nav-btn" onclick="adminPanelAcMobil()"><i class="ti ti-lock"></i><span>ADMIN</span></button>
     </div>
@@ -447,6 +441,14 @@
         <button class="btn btn-danger" onclick="iadeFisiYazdir()" style="flex:1;">🖨️ YAZDIR</button>
         <button onclick="modalKapat('iadeFisiModal')" style="flex:1;padding:12px;background:#e2e8f0;border:none;border-radius:12px;cursor:pointer;font-weight:600;">KAPAT</button>
     </div>
+</div></div>
+
+<!-- İADE MODALİ (Admin korumalı) -->
+<div class="modal" id="iadeModal"><div class="modal-content" style="max-width:560px;">
+    <h3>↩️ SATIŞ İADE</h3>
+    <input type="text" id="iadeAra" placeholder="🔍 Fiş no veya ürün adı ara..." style="width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:12px;margin-bottom:12px;font-size:14px;" oninput="iadeAramaYapListe()">
+    <div id="iadeSatisListesiPage" style="max-height:55vh;overflow-y:auto;"></div>
+    <button onclick="modalKapat('iadeModal')" style="width:100%;margin-top:14px;padding:12px;background:#e2e8f0;border:none;border-radius:12px;cursor:pointer;font-weight:600;">KAPAT</button>
 </div></div>
 
 <div class="modal" id="musteriBorcModal"><div class="modal-content" style="width:95%;max-width:500px;">
@@ -944,6 +946,20 @@ function vardiyaFarkHesapla() { let s = parseFloat(document.getElementById('kasa
 function vardiyaRender() { if (aktifVardiya) { document.getElementById('aktifVardiyaBilgi').innerHTML = `<div class="alert alert-success">✅ ${aktifVardiya.kasiyer} | Açılış: ${aktifVardiya.kasaAcilis}₺</div>`; document.getElementById('vardiyaGirisFormu').style.display = 'none'; document.getElementById('vardiyaBitisFormu').style.display = 'block'; } else { document.getElementById('aktifVardiyaBilgi').innerHTML = `<div class="alert alert-warning">⚠️ Vardiya yok</div>`; document.getElementById('vardiyaGirisFormu').style.display = 'block'; document.getElementById('vardiyaBitisFormu').style.display = 'none'; } document.getElementById('vardiyaListesi').innerHTML = vardiyalar.slice(-10).reverse().map(v=>`<div style="background:#f1f5f9;padding:10px;margin:5px 0;border-radius:12px;"><strong>${v.kasiyer}</strong><br>${new Date(v.baslangic).toLocaleDateString('tr-TR')}<br>Açılış: ${v.kasaAcilis}₺</div>`).join(''); }
 
 // ============ İADE FONKSİYONLARI ============
+
+// Her seferinde şifre sor — oturum önbelleğini atlıyoruz
+function iadeModalAc() {
+    // Şifre modalını direkt aç, oturumu KULLANMA
+    bekleyenIslem = () => {
+        document.getElementById('iadeAra').value = '';
+        iadeAramaYapListe();
+        document.getElementById('iadeModal').classList.add('open');
+    };
+    oturumGecerli = false; // her açılışta şifre zorunlu
+    document.getElementById('adminSifre').value = '';
+    document.getElementById('sifreModal').classList.add('open');
+}
+
 function iadeAramaYapListe() { 
     let a = trN(document.getElementById('iadeAra')?.value || ''); 
     let l = satislar.filter(s => s.id.toString().includes(a) || s.urunler.some(u=>trN(u.ad).includes(a))).slice(0,30); 
@@ -963,8 +979,10 @@ function iadeAramaYapListe() {
             </div>
         </div>`).join(''); 
 }
+
 function iadeOnayla(idx) {
-    sifreIleKorunanIslem(() => {
+    // Her iade onayında da şifre sor
+    bekleyenIslem = () => {
         let s = satislar[idx];
         if (!s || s.iade) return;
         if (!confirm(`${s.toplam.toFixed(2)} ₺ iade edilsin mi? Stoklar geri eklenecek.`)) return;
@@ -975,7 +993,10 @@ function iadeOnayla(idx) {
         toast(`↩️ İade tamamlandı`);
         iadeAramaYapListe();
         iadeFisiGoster(s);
-    });
+    };
+    oturumGecerli = false;
+    document.getElementById('adminSifre').value = '';
+    document.getElementById('sifreModal').classList.add('open');
 }
 
 function iadeFisiGoster(s) {
@@ -1810,6 +1831,7 @@ function adminGridGoster() {
     <div class="admin-card" onclick="kategoriYonetimiAc()"><i class="ti ti-category"></i><div>KATEGORİ</div></div>
     <div class="admin-card" onclick="urunEkleModalAc()" style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-color:#10b981;"><i class="ti ti-plus" style="color:#10b981;"></i><div style="color:#065f46;font-weight:800;">YENİ ÜRÜN</div></div>
     <div class="admin-card" onclick="kasiyerRaporuAc()" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border-color:#3b82f6;"><i class="ti ti-users" style="color:#3b82f6;"></i><div style="color:#1e40af;font-weight:800;">KASİYER</div></div>
+    <div class="admin-card" onclick="iadeModalAc()" style="background:linear-gradient(135deg,#fff1f2,#fee2e2);border-color:#ef4444;"><i class="ti ti-rotate-left" style="color:#ef4444;"></i><div style="color:#991b1b;font-weight:800;">İADE</div></div>
     <div class="admin-card" onclick="musteriBorc()"><i class="ti ti-credit-card"></i><div>MÜŞTERİ BORÇ</div></div>
     <div class="admin-card" onclick="tedarikciYonetimiAc()"><i class="ti ti-truck"></i><div>TEDARİKÇİ</div></div>
     <div class="admin-card" onclick="raporlarAc()"><i class="ti ti-chart-bar"></i><div>RAPORLAR</div></div>
@@ -1822,8 +1844,8 @@ function adminGridGoster() {
 `; }
 
 // ============ SAYFA YÖNETİMİ ============
-function sayfaGoster(page) { document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+page).classList.add('active'); if(page === 'iade') iadeAramaYapListe(); if(page === 'vardiya') vardiyaRender(); }
-function sayfaGosterMobil(page) { sayfaGoster(page); let btns = document.querySelectorAll('.mobile-nav-btn'); for(let btn of btns) { if(btn.innerText.includes(page === 'pos' ? 'SATIŞ' : page === 'iade' ? 'İADE' : page === 'vardiya' ? 'VARDİYA' : 'ADMIN')) { btn.classList.add('active'); } else { btn.classList.remove('active'); } } }
+function sayfaGoster(page) { document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+page).classList.add('active'); if(page === 'vardiya') vardiyaRender(); }
+function sayfaGosterMobil(page) { sayfaGoster(page); let btns = document.querySelectorAll('.mobile-nav-btn'); for(let btn of btns) { if(btn.innerText.includes(page === 'pos' ? 'SATIŞ' : page === 'vardiya' ? 'VARDİYA' : 'ADMIN')) { btn.classList.add('active'); } else { btn.classList.remove('active'); } } }
 function sifreDegistirModalAc() { document.getElementById('sifreDegistirModal').classList.add('open'); }
 function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
 function updateDateTime() { document.getElementById('dateTime').innerHTML = new Date().toLocaleString('tr-TR'); }
