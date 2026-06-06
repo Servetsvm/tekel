@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>TEKEL BAYİSİ </title>
+    <title>TEKEL KASA</title>
     <link href="https://cdn.jsdelivr.net/npm/tabler-icons@1.119.0/iconfont/tabler-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -108,9 +108,11 @@
             border: 1px solid #cbd5e1;
             border-radius: 14px;
             margin-bottom: 16px;
-            max-height: 300px;
+            max-height: 420px;
             overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.13);
+            position: relative;
+            z-index: 50;
         }
         .search-result-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid #e2e8f0; cursor: pointer; flex-wrap: wrap; gap: 8px; }
         .search-result-item:hover { background: #f1f5f9; }
@@ -222,7 +224,7 @@
 </div>
 <div class="container">
     <div class="top-bar">
-        <div class="logo"><i class="ti ti-building-store"></i> TEKEL POS | 100 PUAN</div>
+        <div class="logo"><i class="ti ti-building-store"></i> TEKEL KASA</div>
         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
             <button id="voiceBtn" class="voice-toggle" onclick="sesliKomutToggle()">🎤 SES</button>
             <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙</button>
@@ -243,7 +245,7 @@
             <div class="page active" id="page-pos">
                 <div id="vardiyaUyari" class="alert alert-warning" style="display:none;">⚠️ Vardiya başlatılmamış!</div>
                 <div class="barcode-area" style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
-                    <input type="text" id="barkod" placeholder="🔍 Barkod veya ürün adı..." onkeyup="urunAra(this.value)" autocomplete="off" style="flex:1;padding:10px 12px;font-size:14px;border:2px solid #cbd5e1;border-radius:12px;">
+                    <input type="text" id="barkod" placeholder="🔍 Ürün adı veya barkod (2+ harf)..." onkeyup="urunAra(this.value)" autocomplete="off" style="flex:1;padding:12px 14px;font-size:15px;border:2px solid #cbd5e1;border-radius:12px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#3b82f6'" onblur="this.style.borderColor='#cbd5e1'">
                     <button class="btn btn-success" onclick="kameraBarkodAc()" style="padding:10px 14px;white-space:nowrap;font-size:13px;" title="Kameradan barkod oku">📷 KAMERA</button>
                 </div>
                 <div id="kamera-barkod-container" style="display:none;margin-bottom:12px;border-radius:14px;overflow:hidden;background:#111;position:relative;min-height:60px;">
@@ -467,6 +469,19 @@
     <button onclick="modalKapat('otoYedekModal')" style="width:100%;margin-top:14px;padding:12px;background:#e2e8f0;border:none;border-radius:12px;cursor:pointer;font-weight:600;">KAPAT</button>
 </div></div>
 
+<!-- KASİYER RAPORU MODALİ -->
+<div class="modal" id="kasiyerRaporModal"><div class="modal-content" style="max-width:520px;">
+    <h3>👥 KASİYER / VARDIYA RAPORU</h3>
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+        <button id="krBtn_gun" onclick="kasiyerRaporuGoster('gun')" style="padding:8px 14px;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:12px;background:#e2e8f0;color:#475569;">Bugün</button>
+        <button id="krBtn_hafta" onclick="kasiyerRaporuGoster('hafta')" style="padding:8px 14px;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:12px;background:#e2e8f0;color:#475569;">Son 7 Gün</button>
+        <button id="krBtn_ay" onclick="kasiyerRaporuGoster('ay')" style="padding:8px 14px;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:12px;background:#1e293b;color:white;">Bu Ay</button>
+        <button id="krBtn_tumzaman" onclick="kasiyerRaporuGoster('tumzaman')" style="padding:8px 14px;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:12px;background:#e2e8f0;color:#475569;">Tüm Zaman</button>
+    </div>
+    <div id="kasiyerRaporIcerik" style="max-height:65vh;overflow-y:auto;"></div>
+    <button onclick="modalKapat('kasiyerRaporModal')" style="width:100%;margin-top:14px;padding:12px;background:#e2e8f0;border:none;border-radius:12px;cursor:pointer;font-weight:600;">KAPAT</button>
+</div></div>
+
 <div class="toast" id="toast">Mesaj</div>
 
 <!-- DÖVİZ MODALİ -->
@@ -660,22 +675,163 @@ function stokRenk(stok) {
 }
 
 // ============ ÜRÜN ARAMA ============
-let searchTimeout;
+
+// ============ HIZLI ÜRÜN ARAMA ============
+let _aramaSeciliIndex = -1;
+let _aramaTimeout = null;
+
 function urunAra(val) {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        if (!val || val.length < 2) { document.getElementById('searchResults').style.display = 'none'; return; }
-        let norm = trN(val);
-        let sonuclar = urunler.filter(u => trN(u.ad).includes(norm) || u.barkod.includes(val));
-        let resultsDiv = document.getElementById('searchResults');
-        if (sonuclar.length === 0) {
-            resultsDiv.innerHTML = `<div class="search-result-item"><div><div class="search-result-name">❌ "${val}" bulunamadı</div></div><button class="search-add-btn" onclick="yeniUrunModalAc('${val.replace(/'/g, "\\'")}')">➕ YENİ EKLE</button></div>`;
-        } else {
-            resultsDiv.innerHTML = sonuclar.map(u => `<div class="search-result-item" onclick="sepeteEkle(${u.id})"><div><div class="search-result-name">${u.ad}</div><div style="font-size:11px;color:#94a3b8;">${u.barkod}</div></div><div class="search-result-price">${u.fiyat.toFixed(2)} ₺</div><div class="search-result-stock">📦 ${u.stok}</div><button class="search-add-btn" onclick="event.stopPropagation(); sepeteEkle(${u.id})">EKLE</button></div>`).join('');
-        }
-        resultsDiv.style.display = 'block';
-    }, 200);
+    clearTimeout(_aramaTimeout);
+    _aramaSeciliIndex = -1;
+    _aramaTimeout = setTimeout(() => _urunAraYap(val), 80);
 }
+
+function _urunAraSkoru(urun, norm) {
+    let ad = trN(urun.ad);
+    let skor = 0;
+    if (ad === norm) skor += 100;                        // tam eşleşme
+    else if (ad.startsWith(norm)) skor += 60;            // başlangıç
+    else if (ad.includes(norm)) skor += 30;              // içinde geçiyor
+    if (urun.barkod && urun.barkod.startsWith(norm)) skor += 50;
+    if (urun.barkod && urun.barkod === norm) skor += 120;
+    skor += Math.min(urunAySatisi(urun.ad), 99);         // popülerlik bonusu
+    return skor;
+}
+
+function _stokBadge(stok) {
+    if (stok === 0) return `<span style="background:#fee2e2;color:#ef4444;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;">TÜKENDİ</span>`;
+    if (stok < 5)  return `<span style="background:#fef3c7;color:#d97706;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;">Son ${stok}</span>`;
+    return `<span style="background:#d1fae5;color:#065f46;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;">📦 ${stok}</span>`;
+}
+
+function _vurgula(metin, norm) {
+    // Eşleşen kısımı sarı ile vurgula
+    let idx = trN(metin).indexOf(norm);
+    if (idx < 0) return metin;
+    return metin.slice(0, idx) +
+        `<mark style="background:#fef08a;border-radius:3px;padding:0 1px;">${metin.slice(idx, idx + norm.length)}</mark>` +
+        metin.slice(idx + norm.length);
+}
+
+function _urunAraYap(val) {
+    let resultsDiv = document.getElementById('searchResults');
+    if (!val || val.length < 2) {
+        resultsDiv.style.display = 'none';
+        resultsDiv.innerHTML = '';
+        return;
+    }
+    let norm = trN(val);
+
+    // Barkod tam eşleşmesi → direkt sepete ekle
+    if (val.length >= 8) {
+        let tam = urunler.find(u => u.barkod === val);
+        if (tam) {
+            sepeteEkle(tam.id);
+            document.getElementById('barkod').value = '';
+            resultsDiv.style.display = 'none';
+            return;
+        }
+    }
+
+    let sonuclar = urunler
+        .filter(u => trN(u.ad).includes(norm) || (u.barkod && u.barkod.includes(val)))
+        .map(u => ({ u, skor: _urunAraSkoru(u, norm) }))
+        .sort((a, b) => b.skor - a.skor)
+        .slice(0, 8)
+        .map(x => x.u);
+
+    if (sonuclar.length === 0) {
+        resultsDiv.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;">
+                <div style="color:#94a3b8;font-size:13px;">❌ "<b>${val}</b>" bulunamadı</div>
+                <button class="search-add-btn" onclick="yeniUrunModalAc('${val.replace(/'/g,"\\'")}')">➕ Yeni Ekle</button>
+            </div>`;
+    } else {
+        resultsDiv.innerHTML = sonuclar.map((u, i) => {
+            let katRenk = {'İçecek':'#3b82f6','Sigara':'#ef4444','Atıştırmalık':'#f59e0b','Şekerleme':'#8b5cf6','Diğer':'#64748b'}[u.kategori] || '#64748b';
+            return `<div class="search-result-item arama-satir" id="arama_${i}"
+                onclick="aramaSecEkle(${u.id})"
+                onmouseenter="_aramaHover(${i})"
+                style="cursor:pointer;padding:10px 14px;gap:10px;align-items:center;">
+                <div style="flex:1;min-width:0;">
+                    <div class="search-result-name" style="font-size:14px;">${_vurgula(u.ad, norm)}</div>
+                    <div style="display:flex;gap:6px;align-items:center;margin-top:3px;flex-wrap:wrap;">
+                        <span style="background:${katRenk}22;color:${katRenk};padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600;">${u.kategori}</span>
+                        ${_stokBadge(u.stok)}
+                    </div>
+                </div>
+                <div style="text-align:right;white-space:nowrap;">
+                    <div style="font-size:16px;font-weight:800;color:#3b82f6;">${u.fiyat.toFixed(2)} ₺</div>
+                    <button class="search-add-btn" onclick="event.stopPropagation();aramaSecEkle(${u.id})"
+                        style="margin-top:4px;padding:5px 12px;font-size:12px;font-weight:700;background:#10b981;">
+                        ➕ EKLE
+                    </button>
+                </div>
+            </div>`;
+        }).join('') + `
+        <div style="padding:8px 14px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between;">
+            <span>↑↓ seç &nbsp;·&nbsp; Enter ekle &nbsp;·&nbsp; Esc kapat</span>
+            <span>${sonuclar.length} sonuç</span>
+        </div>`;
+        // İlk sonucu seç
+        _aramaSeciliIndex = 0;
+        _aramaVurgula();
+    }
+    resultsDiv.style.display = 'block';
+}
+
+function _aramaHover(i) {
+    _aramaSeciliIndex = i;
+    _aramaVurgula();
+}
+
+function _aramaVurgula() {
+    document.querySelectorAll('.arama-satir').forEach((el, i) => {
+        el.style.background = i === _aramaSeciliIndex ? '#eff6ff' : '';
+    });
+}
+
+function aramaSecEkle(id) {
+    sepeteEkle(id);
+    document.getElementById('barkod').value = '';
+    document.getElementById('searchResults').style.display = 'none';
+    _aramaSeciliIndex = -1;
+    document.getElementById('barkod').focus();
+}
+
+// Klavye navigasyonu — barkod input'una bağla
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('barkod').addEventListener('keydown', function(e) {
+        let res = document.getElementById('searchResults');
+        if (res.style.display === 'none') return;
+        let satirlar = document.querySelectorAll('.arama-satir');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            _aramaSeciliIndex = Math.min(_aramaSeciliIndex + 1, satirlar.length - 1);
+            _aramaVurgula();
+            satirlar[_aramaSeciliIndex]?.scrollIntoView({block:'nearest'});
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            _aramaSeciliIndex = Math.max(_aramaSeciliIndex - 1, 0);
+            _aramaVurgula();
+            satirlar[_aramaSeciliIndex]?.scrollIntoView({block:'nearest'});
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (_aramaSeciliIndex >= 0 && satirlar[_aramaSeciliIndex]) {
+                satirlar[_aramaSeciliIndex].click();
+            }
+        } else if (e.key === 'Escape') {
+            res.style.display = 'none';
+            _aramaSeciliIndex = -1;
+        }
+    });
+    // Dışarı tıklayınca kapat
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#searchResults') && !e.target.closest('#barkod')) {
+            document.getElementById('searchResults').style.display = 'none';
+        }
+    });
+});
 
 // ============ QR KOD ============
 function qrKodOku() { document.getElementById('qr-reader-container').classList.add('active'); if (html5QrCode) { html5QrCode.stop().then(() => { html5QrCode.clear(); startQr(); }).catch(() => startQr()); } else { startQr(); } }
@@ -774,7 +930,7 @@ function sepetTemizle() { if(confirm('Sepet temizlensin mi?')) { sepet=[]; indir
 function odemeSec(y) { seciliOdeme=y; document.getElementById('btnNakit').classList.toggle('selected', y==='nakit'); document.getElementById('btnKart').classList.toggle('selected', y==='kart'); satisButonKontrol(); toast(`💵 ${y==='nakit'?'Nakit':'Kart'} seçildi`); }
 function satisButonKontrol() { document.getElementById('sellBtn').disabled = !(sepet.length > 0 && seciliOdeme && aktifVardiya); }
 function satisYap() { if (sepet.length===0||!seciliOdeme) { toast('❌ Sepet boş veya ödeme seçilmemiş!'); return; } if (!aktifVardiya) { toast('❌ Önce vardiya başlatın!'); vardiyaUyariGoster(); return; } let toplam = sepet.reduce((s,i)=>s + i.fiyat * i.adet, 0); if (indirimOrani > 0) toplam *= (1 - indirimOrani/100); else if (indirimTutar > 0) toplam = Math.max(0, toplam - indirimTutar); let satis = { id: Date.now(), tarih: new Date(), urunler: sepet.map(i=>({ ad: i.ad, adet: i.adet, fiyat: i.fiyat })), toplam, odeme: seciliOdeme, indirimOrani, indirimTutar, musteri: aktifMusteri ? { ...aktifMusteri } : null, vardiya: aktifVardiya ? aktifVardiya.kasiyer : "-" }; satislar.unshift(satis); sepet.forEach(i => { let u = urunler.find(u=>u.id===i.id); if (u) u.stok -= i.adet; }); fisGoster(satis); sepet = []; seciliOdeme = null; indirimOrani=0; indirimTutar=0; aktifMusteri=null; document.getElementById('aktifMusteriBilgi').innerHTML = ''; document.getElementById('btnNakit').classList.remove('selected'); document.getElementById('btnKart').classList.remove('selected'); urunRender(); sepetRender(); veriKaydet(); toast(`✅ ${satis.toplam.toFixed(2)} ₺ satış tamamlandı!`); if (sesliKomutAktif) konus('Satis tamamlandi.'); }
-function fisGoster(s) { sonSatisFisHtml = `<div class="fis-preview"><div style="text-align:center;"><div style="font-size:16px;font-weight:bold;">🏪 TEKEL BAYİSİ</div><div>${new Date(s.tarih).toLocaleString('tr-TR')}</div><div>Fiş #${s.id.toString().slice(-8)}</div><hr></div>${s.urunler.map(u => `<div style="display:flex;justify-content:space-between;"><span>${u.ad} x${u.adet}</span><span>${(u.fiyat*u.adet).toFixed(2)} ₺</span></div>`).join('')}${s.indirimOrani>0?`<div style="color:#f59e0b;">İndirim %${s.indirimOrani}: -${(s.toplam*s.indirimOrani/100).toFixed(2)} ₺</div>`:''}<hr><div style="font-weight:bold;">TOPLAM: ${s.toplam.toFixed(2)} ₺</div><div>Ödeme: ${s.odeme==='nakit'?'NAKİT':'KART'}</div><div>Kasiyer: ${s.vardiya}</div>${s.musteri?`<div>Müşteri: ${s.musteri.ad}</div>`:''}<hr><div style="text-align:center;font-size:9px;">⭐ İyi günlerde kullanın ⭐</div></div>`; document.getElementById('fisPreviewIcerik').innerHTML = sonSatisFisHtml; document.getElementById('fisPreviewModal').classList.add('open'); }
+function fisGoster(s) { sonSatisFisHtml = `<div class="fis-preview"><div style="text-align:center;"><div style="font-size:16px;font-weight:bold;">🏪 TEKEL KASA</div><div>${new Date(s.tarih).toLocaleString('tr-TR')}</div><div>Fiş #${s.id.toString().slice(-8)}</div><hr></div>${s.urunler.map(u => `<div style="display:flex;justify-content:space-between;"><span>${u.ad} x${u.adet}</span><span>${(u.fiyat*u.adet).toFixed(2)} ₺</span></div>`).join('')}${s.indirimOrani>0?`<div style="color:#f59e0b;">İndirim %${s.indirimOrani}: -${(s.toplam*s.indirimOrani/100).toFixed(2)} ₺</div>`:''}<hr><div style="font-weight:bold;">TOPLAM: ${s.toplam.toFixed(2)} ₺</div><div>Ödeme: ${s.odeme==='nakit'?'NAKİT':'KART'}</div><div>Kasiyer: ${s.vardiya}</div>${s.musteri?`<div>Müşteri: ${s.musteri.ad}</div>`:''}<hr><div style="text-align:center;font-size:9px;">⭐ İyi günlerde kullanın ⭐</div></div>`; document.getElementById('fisPreviewIcerik').innerHTML = sonSatisFisHtml; document.getElementById('fisPreviewModal').classList.add('open'); }
 function fisYazdir() { let w = window.open('', '_blank'); w.document.write(`<html><head><title>Fiş</title><style>body{font-family:monospace;padding:20px;}</style></head><body>${sonSatisFisHtml}</body></html>`); w.document.close(); w.print(); }
 function indirimAc() { let m = prompt('İndirim yüzdesi:'); if(m && !isNaN(m)) { indirimOrani = Math.min(parseFloat(m),100); indirimTutar=0; sepetRender(); toast(`🏷️ %${indirimOrani} indirim`); } }
 function musteriSec() { document.getElementById('musteriModal').classList.add('open'); }
@@ -827,7 +983,7 @@ function iadeFisiGoster(s) {
     document.getElementById('iadeFisiIcerik').innerHTML = `<div style="font-family:monospace;max-width:280px;margin:0 auto;text-align:center;">
         <div style="background:#ef4444;color:white;padding:12px;border-radius:12px 12px 0 0;">
             <div style="font-size:18px;font-weight:900;">↩️ İADE FİŞİ</div>
-            <div style="font-size:11px;opacity:.9;">TEKEL BAYİSİ POS</div>
+            <div style="font-size:11px;opacity:.9;">TEKEL KASAPOS</div>
         </div>
         <div style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:14px;">
             <div style="font-size:11px;color:#64748b;margin-bottom:8px;">${tarih.toLocaleString('tr-TR')} · Fiş #${s.id.toString().slice(-8)}</div>
@@ -939,7 +1095,7 @@ function zGunlukRender() {
     let top5=Object.entries(urunSay).sort((a,b)=>b[1]-a[1]).slice(0,5);
     document.getElementById('zRaporuIcerik').innerHTML=`
         <div style="text-align:center;margin-bottom:12px;background:#1e293b;color:white;padding:12px;border-radius:12px;">
-            <div style="font-size:16px;font-weight:800;">🏪 TEKEL BAYİSİ</div>
+            <div style="font-size:16px;font-weight:800;">🏪 TEKEL KASA</div>
             <div style="font-size:11px;opacity:.8;">GÜN SONU Z RAPORU · ${now.toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}</div>
             ${aktifVardiya?`<div style="font-size:11px;opacity:.8;margin-top:2px;">👤 ${aktifVardiya.kasiyer} · Açılış: ${now.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</div>`:''}
         </div>
@@ -971,7 +1127,7 @@ function zAylikRender() {
     let gSay=gunler.length||1;
     document.getElementById('zRaporuIcerik').innerHTML=`
         <div style="text-align:center;margin-bottom:12px;background:#1e293b;color:white;padding:12px;border-radius:12px;">
-            <div style="font-size:16px;font-weight:800;">🏪 TEKEL BAYİSİ</div>
+            <div style="font-size:16px;font-weight:800;">🏪 TEKEL KASA</div>
             <div style="font-size:11px;opacity:.8;">AYLIK Z RAPORU · ${now.toLocaleDateString('tr-TR',{month:'long',year:'numeric'}).toUpperCase()}</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
@@ -1241,7 +1397,7 @@ function otomatikYedekAl(sessiz) {
         let tarihStr = new Date().toLocaleDateString('tr-TR').replace(/\./g,'-');
         let saatStr = new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}).replace(':','-');
         a.href = url;
-        a.download = `TekelPOS_OtoYedek_${tarihStr}_${saatStr}.tekelbackup`;
+        a.download = `TekelKasa_OtoYedek_${tarihStr}_${saatStr}.tekelbackup`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1384,29 +1540,250 @@ function etiketYazdir() {
     let u = urunler.find(x=>x.id===id);
     if(!u) { toast('❌ Ürün seçin!'); return; }
     let adet = parseInt(document.getElementById('etiketAdet').value) || 1;
-    // SVG barkod çizgileri oluştur (Code128 benzeri görsel)
-    function barcodeSvg(text) {
-        let bars = [];
-        let x = 0;
-        const seed = text.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
-        for(let i=0;i<60;i++){
-            let w = ((seed*7+i*13)%3)+1;
-            let dark = (seed+i*3)%3!==0;
-            bars.push(`<rect x="${x}" y="0" width="${w}" height="50" fill="${dark?'black':'white'}"/>`);
-            x+=w+(dark?0:1);
+
+    // Gerçek Code128 barkod üreteci
+    function code128Svg(text) {
+        // Code128B karakter seti
+        const CODE128_B_START = 104;
+        const CODE128_STOP = 106;
+        const charValues = {};
+        for (let i = 32; i <= 126; i++) charValues[String.fromCharCode(i)] = i - 32;
+
+        // Encode
+        let codes = [CODE128_B_START];
+        let checksum = CODE128_B_START;
+        for (let i = 0; i < text.length; i++) {
+            let ch = text[i];
+            let val = charValues[ch] !== undefined ? charValues[ch] : 0;
+            codes.push(val);
+            checksum += val * (i + 1);
         }
-        return `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="50" viewBox="0 0 ${x} 50" style="display:block;margin:0 auto;">${bars.join('')}</svg>`;
+        codes.push(checksum % 103);
+        codes.push(CODE128_STOP);
+
+        // Code128 bar patterns (11 bits each, stop=13 bits)
+        const patterns = [
+            '11011001100','11001101100','11001100110','10010011000','10010001100',
+            '10001001100','10011001000','10011000100','10001100100','11001001000',
+            '11001000100','11000100100','10110011100','10011011100','10011001110',
+            '10111001100','10011101100','10011100110','11001110010','11001011100',
+            '11001001110','11011100100','11001110100','11101101110','11101001100',
+            '11100101100','11100100110','11101100100','11100110100','11100110010',
+            '11011011000','11011000110','11000110110','10100011000','10001011000',
+            '10001000110','10110001000','10001101000','10001100010','11010001000',
+            '11000101000','11000100010','10110111000','10110001110','10001101110',
+            '10111011000','10111000110','10001110110','11101110110','11010001110',
+            '11000101110','11011101000','11011100010','11011101110','11101011000',
+            '11101000110','11100010110','11101101000','11101100010','11100011010',
+            '11101111010','11001000010','11110001010','10100110000','10100001100',
+            '10010110000','10010000110','10000101100','10000100110','10110010000',
+            '10110000100','10011010000','10011000010','10000110100','10000110010',
+            '11000010010','11001010000','11110111010','11000010100','10001111010',
+            '10100111100','10010111100','10010011110','10111100100','10011110100',
+            '10011110010','11110100100','11110010100','11110010010','11011011110',
+            '11011110110','11110110110','10101111000','10100011110','10001011110',
+            '10111101000','10111100010','11110101000','11110100010','10111011110',
+            '10111101110','11101011110','11110101110','11010000100','11010010000',
+            '11010011100','1100011101011'
+        ];
+
+        let bars = '';
+        let x = 10; // left margin
+        const H = 60;
+        const moduleW = 2;
+
+        for (let ci = 0; ci < codes.length; ci++) {
+            let pattern = patterns[codes[ci]] || patterns[0];
+            for (let bi = 0; bi < pattern.length; bi++) {
+                let fill = pattern[bi] === '1' ? 'black' : 'white';
+                bars += `<rect x="${x}" y="0" width="${moduleW}" height="${H}" fill="${fill}"/>`;
+                x += moduleW;
+            }
+        }
+        let totalW = x + 10;
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="${H}" viewBox="0 0 ${totalW} ${H}" style="display:block;margin:0 auto;"><rect width="${totalW}" height="${H}" fill="white"/>${bars}</svg>`;
     }
-    let etiket = `<div style="border:1px solid #ccc;border-radius:6px;padding:10px;text-align:center;width:58mm;display:inline-block;margin:2mm;page-break-inside:avoid;">
-        <div style="font-size:20px;font-weight:900;letter-spacing:-0.5px;margin-bottom:6px;line-height:1.2;">${u.ad}</div>
-        ${barcodeSvg(u.barkod)}
-        <div style="font-size:9px;letter-spacing:2px;margin:4px 0 6px;font-family:monospace;">${u.barkod}</div>
-        <div style="font-size:22px;font-weight:900;color:#1e293b;">${u.fiyat.toFixed(2)} ₺</div>
+
+    let etiket = `<div style="border:1px solid #ccc;border-radius:6px;padding:8px 10px;text-align:center;width:58mm;display:inline-block;margin:2mm;page-break-inside:avoid;background:white;">
+        <div style="font-size:14px;font-weight:900;letter-spacing:-0.3px;margin-bottom:4px;line-height:1.2;">${u.ad}</div>
+        ${code128Svg(u.barkod || String(u.id))}
+        <div style="font-size:22px;font-weight:900;color:#1e293b;margin-top:4px;">${u.fiyat.toFixed(2)} ₺</div>
     </div>`;
     let w = window.open('', '_blank');
     w.document.write(`<html><head><title>Etiket</title><style>body{margin:2mm;background:white;}@media print{@page{size:58mm auto;margin:1mm;}}</style></head><body>${Array(adet).fill(etiket).join('')}</body></html>`);
     w.document.close(); w.print();
     toast(`✅ ${adet} etiket yazdırılıyor`);
+}
+
+// ============ KASİYER RAPORU ============
+function kasiyerRaporuAc() {
+    kasiyerRaporuGoster('ay');
+    document.getElementById('kasiyerRaporModal').classList.add('open');
+}
+
+function kasiyerRaporuGoster(donem) {
+    ['gun','hafta','ay','tumzaman'].forEach(d => {
+        let btn = document.getElementById('krBtn_' + d);
+        if (btn) { btn.style.background = d === donem ? '#1e293b' : '#e2e8f0'; btn.style.color = d === donem ? 'white' : '#475569'; }
+    });
+
+    let now = new Date();
+    let filtrelenmis = satislar.filter(s => {
+        if (s.iade) return false;
+        let d = new Date(s.tarih);
+        if (donem === 'gun') return d.toDateString() === now.toDateString();
+        if (donem === 'hafta') { let h = new Date(); h.setDate(now.getDate()-7); return d >= h; }
+        if (donem === 'ay') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        return true; // tumzaman
+    });
+
+    // Kasiyer bazlı istatistik
+    let kasiyerler = {};
+    filtrelenmis.forEach(s => {
+        let k = s.vardiya || 'Bilinmiyor';
+        if (!kasiyerler[k]) kasiyerler[k] = { satis: 0, ciro: 0, nakit: 0, kart: 0, urunAdet: 0, indirimToplam: 0 };
+        kasiyerler[k].satis++;
+        kasiyerler[k].ciro += s.toplam;
+        if (s.odeme === 'nakit') kasiyerler[k].nakit += s.toplam;
+        else kasiyerler[k].kart += s.toplam;
+        kasiyerler[k].urunAdet += s.urunler.reduce((t, u) => t + u.adet, 0);
+        if (s.indirimOrani > 0 || s.indirimTutar > 0) {
+            let ham = s.urunler.reduce((t, u) => t + u.fiyat * u.adet, 0);
+            kasiyerler[k].indirimToplam += ham - s.toplam;
+        }
+    });
+
+    let sirali = Object.entries(kasiyerler).sort((a, b) => b[1].ciro - a[1].ciro);
+    let toplamCiro = sirali.reduce((t, [, v]) => t + v.ciro, 0);
+    let toplamSatis = sirali.reduce((t, [, v]) => t + v.satis, 0);
+
+    // Vardiya geçmişinden ek bilgi
+    let vardiyaIstatistik = {};
+    vardiyalar.forEach(v => {
+        let k = v.kasiyer;
+        if (!vardiyaIstatistik[k]) vardiyaIstatistik[k] = { vardiyaSayisi: 0 };
+        vardiyaIstatistik[k].vardiyaSayisi++;
+    });
+    if (aktifVardiya) {
+        let k = aktifVardiya.kasiyer;
+        if (!vardiyaIstatistik[k]) vardiyaIstatistik[k] = { vardiyaSayisi: 0 };
+        vardiyaIstatistik[k].vardiyaSayisi++;
+    }
+
+    const renkler = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#84cc16','#f43f5e'];
+
+    let html = '';
+    if (sirali.length === 0) {
+        html = '<div style="text-align:center;padding:40px;color:#94a3b8;">Bu dönemde satış yok</div>';
+    } else {
+        // Özet kartlar
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+            <div style="background:#eff6ff;border-radius:12px;padding:12px;text-align:center;">
+                <div style="font-size:20px;font-weight:800;color:#3b82f6;">${toplamCiro.toFixed(0)} ₺</div>
+                <div style="font-size:11px;color:#64748b;">Toplam Ciro</div>
+            </div>
+            <div style="background:#f0fdf4;border-radius:12px;padding:12px;text-align:center;">
+                <div style="font-size:20px;font-weight:800;color:#10b981;">${toplamSatis}</div>
+                <div style="font-size:11px;color:#64748b;">Toplam Satış</div>
+            </div>
+        </div>`;
+
+        // Ciro payı grafiği (bar chart SVG)
+        if (sirali.length > 0 && toplamCiro > 0) {
+            let barHtml = sirali.map(([ad, v], i) => {
+                let pay = toplamCiro > 0 ? (v.ciro / toplamCiro * 100) : 0;
+                return `<div style="margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+                        <span style="font-weight:700;">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '} ${ad}</span>
+                        <span style="color:${renkler[i%renkler.length]};font-weight:700;">${v.ciro.toFixed(2)} ₺ (${pay.toFixed(1)}%)</span>
+                    </div>
+                    <div style="background:#f1f5f9;border-radius:6px;height:10px;overflow:hidden;">
+                        <div style="background:${renkler[i%renkler.length]};height:100%;border-radius:6px;width:${pay}%;transition:width 0.5s;"></div>
+                    </div>
+                </div>`;
+            }).join('');
+            html += `<div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-bottom:14px;">
+                <div style="font-weight:700;font-size:13px;margin-bottom:12px;">📊 Ciro Payı</div>
+                ${barHtml}
+            </div>`;
+        }
+
+        // Detaylı kasiyer kartları
+        sirali.forEach(([ad, v], i) => {
+            let renk = renkler[i % renkler.length];
+            let ortFis = v.satis > 0 ? (v.ciro / v.satis) : 0;
+            let vSay = vardiyaIstatistik[ad]?.vardiyaSayisi || 0;
+            html += `<div style="background:white;border:2px solid ${renk}22;border-left:4px solid ${renk};border-radius:14px;padding:14px;margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <div style="font-weight:800;font-size:15px;">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'👤'} ${ad}</div>
+                    <div style="font-size:18px;font-weight:900;color:${renk};">${v.ciro.toFixed(2)} ₺</div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:11px;">
+                    <div style="background:#f8fafc;border-radius:10px;padding:8px;text-align:center;">
+                        <div style="font-weight:700;font-size:14px;">${v.satis}</div>
+                        <div style="color:#64748b;">Satış</div>
+                    </div>
+                    <div style="background:#f0fdf4;border-radius:10px;padding:8px;text-align:center;">
+                        <div style="font-weight:700;font-size:14px;color:#10b981;">${v.nakit.toFixed(0)} ₺</div>
+                        <div style="color:#64748b;">💵 Nakit</div>
+                    </div>
+                    <div style="background:#eff6ff;border-radius:10px;padding:8px;text-align:center;">
+                        <div style="font-weight:700;font-size:14px;color:#3b82f6;">${v.kart.toFixed(0)} ₺</div>
+                        <div style="color:#64748b;">💳 Kart</div>
+                    </div>
+                    <div style="background:#fef3c7;border-radius:10px;padding:8px;text-align:center;">
+                        <div style="font-weight:700;font-size:13px;color:#d97706;">${ortFis.toFixed(2)} ₺</div>
+                        <div style="color:#64748b;">Ort. Fiş</div>
+                    </div>
+                    <div style="background:#f5f3ff;border-radius:10px;padding:8px;text-align:center;">
+                        <div style="font-weight:700;font-size:14px;color:#8b5cf6;">${v.urunAdet}</div>
+                        <div style="color:#64748b;">Ürün Adedi</div>
+                    </div>
+                    <div style="background:#fdf2f8;border-radius:10px;padding:8px;text-align:center;">
+                        <div style="font-weight:700;font-size:14px;color:#ec4899;">${vSay}</div>
+                        <div style="color:#64748b;">Vardiya</div>
+                    </div>
+                </div>
+                ${v.indirimToplam > 0 ? `<div style="margin-top:8px;font-size:11px;color:#f59e0b;text-align:right;">🏷️ Toplam indirim: ${v.indirimToplam.toFixed(2)} ₺</div>` : ''}
+            </div>`;
+        });
+
+        // Shift karşılaştırması - vardiyalar tablosu
+        if (vardiyalar.length > 1) {
+            let sonVardiyalar = vardiyalar.slice(-10).reverse();
+            html += `<div style="border:1px solid #e2e8f0;border-radius:14px;padding:14px;margin-bottom:10px;">
+                <div style="font-weight:700;font-size:13px;margin-bottom:10px;">⏱️ Son Vardiya Karşılaştırması</div>
+                <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                    <thead><tr style="background:#f8fafc;">
+                        <th style="padding:6px;text-align:left;">Kasiyer</th>
+                        <th style="padding:6px;text-align:right;">Tarih</th>
+                        <th style="padding:6px;text-align:right;">Ciro</th>
+                        <th style="padding:6px;text-align:right;">Satış</th>
+                    </tr></thead>
+                    <tbody>${sonVardiyalar.map(v => {
+                        let vBaslangic = new Date(v.baslangic);
+                        let vBitis = v.bitis ? new Date(v.bitis) : null;
+                        let vSatislar = satislar.filter(s => {
+                            let d = new Date(s.tarih);
+                            return !s.iade && s.vardiya === v.kasiyer
+                                && d >= vBaslangic
+                                && (!vBitis || d <= vBitis);
+                        });
+                        let vCiro = vSatislar.reduce((t, s) => t + s.toplam, 0);
+                        return `<tr style="border-bottom:1px solid #f1f5f9;">
+                            <td style="padding:6px;font-weight:600;">${v.kasiyer}</td>
+                            <td style="padding:6px;text-align:right;color:#64748b;">${vBaslangic.toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit'})}</td>
+                            <td style="padding:6px;text-align:right;font-weight:700;color:#10b981;">${vCiro.toFixed(0)} ₺</td>
+                            <td style="padding:6px;text-align:right;">${vSatislar.length}</td>
+                        </tr>`;
+                    }).join('')}</tbody>
+                </table></div>
+            </div>`;
+        }
+    }
+
+    document.getElementById('kasiyerRaporIcerik').innerHTML = html;
 }
 
 // ============ KAMPANYA ============
@@ -1431,6 +1808,8 @@ function adminGridGoster() {
     <div class="admin-card" onclick="barkodEtiketAc()"><i class="ti ti-barcode"></i><div>ETİKET</div></div>
     <div class="admin-card" onclick="stokYonetimiAc()"><i class="ti ti-box"></i><div>STOK</div></div>
     <div class="admin-card" onclick="kategoriYonetimiAc()"><i class="ti ti-category"></i><div>KATEGORİ</div></div>
+    <div class="admin-card" onclick="urunEkleModalAc()" style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-color:#10b981;"><i class="ti ti-plus" style="color:#10b981;"></i><div style="color:#065f46;font-weight:800;">YENİ ÜRÜN</div></div>
+    <div class="admin-card" onclick="kasiyerRaporuAc()" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border-color:#3b82f6;"><i class="ti ti-users" style="color:#3b82f6;"></i><div style="color:#1e40af;font-weight:800;">KASİYER</div></div>
     <div class="admin-card" onclick="musteriBorc()"><i class="ti ti-credit-card"></i><div>MÜŞTERİ BORÇ</div></div>
     <div class="admin-card" onclick="tedarikciYonetimiAc()"><i class="ti ti-truck"></i><div>TEDARİKÇİ</div></div>
     <div class="admin-card" onclick="raporlarAc()"><i class="ti ti-chart-bar"></i><div>RAPORLAR</div></div>
@@ -1440,7 +1819,6 @@ function adminGridGoster() {
     <div class="admin-card" onclick="yedekAl()"><i class="ti ti-database"></i><div>YEDEK AL</div></div>
     <div class="admin-card" onclick="yedekDosyaSec()"><i class="ti ti-folder-open"></i><div>GERİ YÜKLE</div></div>
     <div class="admin-card" onclick="otoYedekAyarAc()"><i class="ti ti-clock"></i><div>OTO YEDEK</div></div>
-    <div class="admin-card" onclick="kasayiSifirla()"><i class="ti ti-trash"></i><div>KASA SIFIRLA</div></div>
 `; }
 
 // ============ SAYFA YÖNETİMİ ============
@@ -1455,7 +1833,7 @@ function modalKapat(id) { document.getElementById(id).classList.remove('open'); 
 // ============ PWA ============
 let pwaPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); pwaPrompt = e; });
-const manifest = { name: "Tekel Bayisi POS", short_name: "Tekel POS", start_url: "./", display: "standalone", theme_color: "#1e293b", background_color: "#1e293b", icons: [{ src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='#3b82f6'/><text x='50' y='70' text-anchor='middle' fill='white' font-size='60'>🏪</text></svg>", sizes: "192x192", type: "image/svg+xml" }] };
+const manifest = { name: "Tekel Kasa", short_name: "Tekel Kasa", start_url: "./", display: "standalone", theme_color: "#1e293b", background_color: "#1e293b", icons: [{ src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='#3b82f6'/><text x='50' y='70' text-anchor='middle' fill='white' font-size='60'>🏪</text></svg>", sizes: "192x192", type: "image/svg+xml" }] };
 document.getElementById('pwaManifest')?.setAttribute('href', URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type:'application/json'})));
 if('serviceWorker' in navigator) { navigator.serviceWorker.register(URL.createObjectURL(new Blob([`self.addEventListener('install',e=>e.waitUntil(caches.open('tekel-v6').then(c=>c.addAll(['./',location.href])))); self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`], {type:'application/javascript'}))).catch(()=>{}); }
 
@@ -1669,7 +2047,7 @@ function musteriBorcRender() {
 veriYukle(); tumRender(); vardiyaRender(); setInterval(updateDateTime, 1000); updateDateTime();
 dovizKurlarYukle();
 otomatikYedekKontrol();
-toast('🏆 100 PUAN POS SİSTEMİ HAZIR!');
+toast('🏪 TEKEL KASA HAZIR!');
 
 document.addEventListener('keydown', (e) => {
     if(e.key === 'F1') { e.preventDefault(); document.getElementById('barkod').focus(); }
