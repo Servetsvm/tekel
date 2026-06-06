@@ -297,6 +297,13 @@
 
             <div class="page" id="page-admin">
                 <h3 style="font-size: 18px; margin-bottom: 12px;">🔐 ADMIN PANELİ</h3>
+                <div id="otoYedekDurumBant" onclick="otoYedekAyarAc()" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+                    <div style="font-size:12px;color:#065f46;">
+                        <span style="font-weight:700;">💾 Oto Yedek</span>
+                        <span id="otoYedekDurumText" style="margin-left:8px;"></span>
+                    </div>
+                    <span style="font-size:11px;color:#64748b;">Ayarlar ›</span>
+                </div>
                 <div class="admin-grid" id="adminGrid"></div>
                 <input type="file" id="yedekDosyaInput" style="display:none" accept=".tekelbackup,.json" onchange="yedekDosyasindanYukle(event)">
             </div>
@@ -451,6 +458,13 @@
     </div>
     <div id="borcListesi" style="max-height:350px;overflow-y:auto;"></div>
     <button onclick="modalKapat('musteriBorcModal')" style="width:100%;margin-top:14px;padding:12px;background:#e2e8f0;border:none;border-radius:12px;cursor:pointer;font-weight:600;">KAPAT</button>
+</div></div>
+
+<!-- OTO YEDEK MODALİ -->
+<div class="modal" id="otoYedekModal"><div class="modal-content" style="max-width:420px;">
+    <h3>🕐 OTOMATİK YEDEK AYARLARI</h3>
+    <div id="otoYedekIcerik"></div>
+    <button onclick="modalKapat('otoYedekModal')" style="width:100%;margin-top:14px;padding:12px;background:#e2e8f0;border:none;border-radius:12px;cursor:pointer;font-weight:600;">KAPAT</button>
 </div></div>
 
 <div class="toast" id="toast">Mesaj</div>
@@ -1187,41 +1201,147 @@ function urunAySatisi(urunAd) {
 }
 
 // ============ OTOMATİK YEDEK ============
+let otoYedekTimer = null;
+
 function otomatikYedekKontrol() {
+    let aktif = localStorage.getItem('tekel_otoYedekAktif');
+    if (aktif === 'hayir') return; // Kullanıcı kapattıysa çalıştırma
     let sonYedek = localStorage.getItem('tekel_sonYedekTarih');
+    let aralik = parseInt(localStorage.getItem('tekel_otoYedekAralik')) || 24; // saat
     let simdi = Date.now();
-    let birGun = 24 * 60 * 60 * 1000;
-    if (!sonYedek || (simdi - parseInt(sonYedek)) > birGun) {
-        setTimeout(() => {
-            otomatikYedekAl();
-        }, 4000); // Program açıldıktan 4 saniye sonra sessizce al
+    let aralikMs = aralik * 60 * 60 * 1000;
+    if (!sonYedek || (simdi - parseInt(sonYedek)) > aralikMs) {
+        setTimeout(() => { otomatikYedekAl(true); }, 4000);
     }
+    // Periyodik kontrol: her saat kontrol et
+    if (otoYedekTimer) clearInterval(otoYedekTimer);
+    otoYedekTimer = setInterval(() => {
+        let aktifMi = localStorage.getItem('tekel_otoYedekAktif');
+        if (aktifMi === 'hayir') return;
+        let sy = localStorage.getItem('tekel_sonYedekTarih');
+        let ar = parseInt(localStorage.getItem('tekel_otoYedekAralik')) || 24;
+        if (!sy || (Date.now() - parseInt(sy)) > ar * 3600000) {
+            otomatikYedekAl(true);
+        }
+    }, 3600000); // saatte bir kontrol
 }
 
-function otomatikYedekAl() {
+function otomatikYedekAl(sessiz) {
     try {
         let yedek = {
             version: "1.0", type: "tekel_pos_backup",
             kategoriler, urunler, musteriler, nextId, kampanyalar, tedarikciler, faturalar,
             satislar: satislar.map(s => ({...s, tarih: new Date(s.tarih).toISOString()})),
-            vardiyalar,
+            vardiyalar, adminSifre: adminSifreHash,
             tarih: new Date().toISOString()
         };
         let blob = new Blob([JSON.stringify(yedek, null, 2)], {type: 'application/json'});
         let url = URL.createObjectURL(blob);
         let a = document.createElement('a');
         let tarihStr = new Date().toLocaleDateString('tr-TR').replace(/\./g,'-');
+        let saatStr = new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}).replace(':','-');
         a.href = url;
-        a.download = `TekelPOS_OtomatikYedek_${tarihStr}.tekelbackup`;
+        a.download = `TekelPOS_OtoYedek_${tarihStr}_${saatStr}.tekelbackup`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        localStorage.setItem('tekel_sonYedekTarih', Date.now().toString());
-        toast('💾 Otomatik yedek alındı (' + tarihStr + ')');
+        let now = Date.now();
+        localStorage.setItem('tekel_sonYedekTarih', now.toString());
+        // Yedek geçmişini kaydet (son 10)
+        let gecmis = JSON.parse(localStorage.getItem('tekel_yedekGecmis') || '[]');
+        gecmis.unshift({ tarih: new Date().toISOString(), tip: sessiz ? 'otomatik' : 'manuel' });
+        if (gecmis.length > 10) gecmis = gecmis.slice(0, 10);
+        localStorage.setItem('tekel_yedekGecmis', JSON.stringify(gecmis));
+        if (!sessiz) toast('✅ Yedek alındı! (' + tarihStr + ')');
+        else toast('💾 Oto yedek alındı (' + tarihStr + ')');
+        // Oto yedek ayarları modalı açıksa güncelle
+        let modal = document.getElementById('otoYedekModal');
+        if (modal && modal.classList.contains('open')) otoYedekModalGuncelle();
     } catch(e) {
         console.error('Otomatik yedek hatası:', e);
+        toast('❌ Yedek alınamadı!');
     }
+}
+
+function otoYedekAyarAc() {
+    otoYedekModalGuncelle();
+    document.getElementById('otoYedekModal').classList.add('open');
+}
+
+function otoYedekModalGuncelle() {
+    let aktif = localStorage.getItem('tekel_otoYedekAktif') !== 'hayir';
+    let aralik = parseInt(localStorage.getItem('tekel_otoYedekAralik')) || 24;
+    let sonYedek = localStorage.getItem('tekel_sonYedekTarih');
+    let gecmis = JSON.parse(localStorage.getItem('tekel_yedekGecmis') || '[]');
+    let sonYedekStr = sonYedek
+        ? new Date(parseInt(sonYedek)).toLocaleString('tr-TR')
+        : 'Henüz yedek alınmadı';
+    let sonrakiMs = sonYedek ? (parseInt(sonYedek) + aralik * 3600000 - Date.now()) : 0;
+    let sonrakiStr = aktif && sonrakiMs > 0
+        ? Math.ceil(sonrakiMs / 3600000) + ' saat sonra'
+        : (aktif ? 'Yakında' : 'Kapalı');
+    document.getElementById('otoYedekIcerik').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+            <div style="background:${aktif?'#d1fae5':'#fee2e2'};border-radius:12px;padding:12px;text-align:center;">
+                <div style="font-size:22px;">${aktif?'✅':'❌'}</div>
+                <div style="font-size:12px;font-weight:700;color:${aktif?'#065f46':'#991b1b'};">${aktif?'AKTİF':'KAPALI'}</div>
+            </div>
+            <div style="background:#eff6ff;border-radius:12px;padding:12px;text-align:center;">
+                <div style="font-size:18px;font-weight:800;color:#3b82f6;">${aralik}h</div>
+                <div style="font-size:11px;color:#64748b;">Yedek aralığı</div>
+            </div>
+        </div>
+        <div style="background:#f8fafc;border-radius:12px;padding:12px;margin-bottom:12px;font-size:12px;">
+            <div style="margin-bottom:4px;">🕐 <strong>Son yedek:</strong> ${sonYedekStr}</div>
+            <div>⏭️ <strong>Sonraki yedek:</strong> ${sonrakiStr}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+            <div>
+                <label style="font-size:12px;font-weight:600;">Yedek Aralığı (Saat)</label>
+                <select id="otoYedekAralikSec" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:10px;margin-top:4px;font-size:14px;">
+                    <option value="6" ${aralik===6?'selected':''}>6 saat</option>
+                    <option value="12" ${aralik===12?'selected':''}>12 saat</option>
+                    <option value="24" ${aralik===24?'selected':''}>24 saat (Günlük)</option>
+                    <option value="48" ${aralik===48?'selected':''}>48 saat</option>
+                </select>
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+                <button onclick="otoYedekKaydet()" class="btn btn-success" style="width:100%;padding:10px;">💾 KAYDET</button>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+            <button onclick="otoYedekAcKapat(${!aktif})" class="btn ${aktif?'btn-danger':'btn-success'}" style="padding:10px;">
+                ${aktif?'⏹️ DURDUR':'▶️ AKTİF ET'}
+            </button>
+            <button onclick="otomatikYedekAl(false)" class="btn btn-warning" style="padding:10px;">📥 ŞİMDİ AL</button>
+        </div>
+        ${gecmis.length > 0 ? `
+        <div style="border-top:1px solid #e2e8f0;padding-top:12px;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px;">📋 Son Yedekler</div>
+            ${gecmis.map(g=>`
+                <div style="display:flex;justify-content:space-between;font-size:11px;padding:5px 0;border-bottom:1px solid #f1f5f9;">
+                    <span>${new Date(g.tarih).toLocaleString('tr-TR')}</span>
+                    <span style="background:${g.tip==='otomatik'?'#eff6ff':'#d1fae5'};color:${g.tip==='otomatik'?'#3b82f6':'#065f46'};padding:2px 8px;border-radius:10px;">${g.tip==='otomatik'?'🤖 Oto':'👤 Manuel'}</span>
+                </div>`).join('')}
+        </div>` : '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:10px;">Henüz yedek geçmişi yok</div>'}
+    `;
+}
+
+function otoYedekAcKapat(ac) {
+    localStorage.setItem('tekel_otoYedekAktif', ac ? 'evet' : 'hayir');
+    if (ac) otomatikYedekKontrol();
+    else if (otoYedekTimer) { clearInterval(otoYedekTimer); otoYedekTimer = null; }
+    toast(ac ? '✅ Oto yedek aktif edildi' : '⏹️ Oto yedek durduruldu');
+    otoYedekModalGuncelle();
+}
+
+function otoYedekKaydet() {
+    let aralik = parseInt(document.getElementById('otoYedekAralikSec').value);
+    localStorage.setItem('tekel_otoYedekAralik', aralik);
+    toast(`✅ Yedek aralığı ${aralik} saat olarak ayarlandı`);
+    otoYedekModalGuncelle();
+    otomatikYedekKontrol();
 }
 function stokEsikAyarla() {
     let yeni = prompt(`Stok kritik eşik (şu an: ${stokKritikEsik}):`, stokKritikEsik);
@@ -1297,7 +1417,16 @@ function kampanyaSil(i) { kampanyalar.splice(i,1); veriKaydet(); kampanyaAc(); t
 // ============ ADMIN PANELİ ============
 function adminPanelAc() { sifreIleKorunanIslem(() => { sayfaGoster('admin'); adminGridGoster(); }); }
 function adminPanelAcMobil() { adminPanelAc(); sayfaGosterMobil('admin'); }
-function adminGridGoster() { document.getElementById('adminGrid').innerHTML = `
+function adminGridGoster() {
+    // Oto yedek durum bandını güncelle
+    let aktif = localStorage.getItem('tekel_otoYedekAktif') !== 'hayir';
+    let sonYedek = localStorage.getItem('tekel_sonYedekTarih');
+    let sonYedekStr = sonYedek ? new Date(parseInt(sonYedek)).toLocaleString('tr-TR') : 'Henüz alınmadı';
+    let durumEl = document.getElementById('otoYedekDurumText');
+    if (durumEl) durumEl.innerHTML = aktif
+        ? `<span style="color:#10b981;">AKTİF</span> · Son: ${sonYedekStr}`
+        : `<span style="color:#ef4444;">KAPALI</span>`;
+    document.getElementById('adminGrid').innerHTML = `
     <div class="admin-card" onclick="karZararAc()"><i class="ti ti-trending-up"></i><div>KAR/ZARAR</div></div>
     <div class="admin-card" onclick="barkodEtiketAc()"><i class="ti ti-barcode"></i><div>ETİKET</div></div>
     <div class="admin-card" onclick="stokYonetimiAc()"><i class="ti ti-box"></i><div>STOK</div></div>
@@ -1310,6 +1439,8 @@ function adminGridGoster() { document.getElementById('adminGrid').innerHTML = `
     <div class="admin-card" onclick="sifreDegistirModalAc()"><i class="ti ti-key"></i><div>ŞİFRE</div></div>
     <div class="admin-card" onclick="yedekAl()"><i class="ti ti-database"></i><div>YEDEK AL</div></div>
     <div class="admin-card" onclick="yedekDosyaSec()"><i class="ti ti-folder-open"></i><div>GERİ YÜKLE</div></div>
+    <div class="admin-card" onclick="otoYedekAyarAc()"><i class="ti ti-clock"></i><div>OTO YEDEK</div></div>
+    <div class="admin-card" onclick="kasayiSifirla()"><i class="ti ti-trash"></i><div>KASA SIFIRLA</div></div>
 `; }
 
 // ============ SAYFA YÖNETİMİ ============
