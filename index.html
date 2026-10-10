@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>TEKEL KASA</title>
-    <link href="https://cdn.jsdelivr.net/npm/tabler-icons@1.119.0/iconfont/tabler-icons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
@@ -349,9 +349,13 @@
 
 <div class="modal" id="sifreModal"><div class="modal-content"><h3>🔐 YETKİ DOĞRULAMA</h3><div class="form-group"><label>Admin Şifresi</label><input type="password" id="adminSifre" onkeypress="sifreEnter(event)"></div><div class="form-group"><input type="checkbox" id="beniHatirla"> <label>Beni Hatırla</label></div><div style="display: flex; gap: 10px;"><button class="btn" onclick="sifreDogrula()">DOĞRULA</button><button class="btn btn-warning" onclick="sifreUnuttumModalAc()">ŞİFREMİ UNUTTUM</button><button onclick="modalKapat('sifreModal')">İPTAL</button></div></div></div>
 
-<div class="modal" id="sifreDegistirModal"><div class="modal-content"><h3>🔑 ŞİFRE DEĞİŞTİR</h3><div class="form-group"><label>Mevcut Şifre</label><input type="password" id="eskiSifre"></div><div class="form-group"><label>Yeni Şifre</label><input type="password" id="yeniSifre"></div><div class="form-group"><label>Yeni Şifre (Tekrar)</label><input type="password" id="yeniSifreTekrar"></div><button class="btn" onclick="sifreDegistir()">DEĞİŞTİR</button><button onclick="modalKapat('sifreDegistirModal')">İPTAL</button></div></div>
+<div class="modal" id="ilkSifreModal"><div class="modal-content"><h3>🔐 YÖNETİCİ ŞİFRESİ BELİRLEYİN</h3><p style="font-size:13px;color:#64748b;margin-bottom:10px;">İlk kurulum: raporlar, stok, vardiya ve ayarlar bu şifreyle korunur. En az 4 karakter.</p><div class="form-group"><label>Yeni Şifre</label><input type="password" id="ilkSifre"></div><div class="form-group"><label>Yeni Şifre (Tekrar)</label><input type="password" id="ilkSifreTekrar" onkeypress="if(event.key==='Enter')ilkSifreKaydet()"></div><button class="btn" onclick="ilkSifreKaydet()">KAYDET</button><button onclick="modalKapat('ilkSifreModal')">İPTAL</button></div></div>
 
-<div class="modal" id="sifreUnuttumModal"><div class="modal-content"><h3>❓ ŞİFRE SIFIRLAMA</h3><div class="form-group"><label>Sıfırlama Kodu</label><input type="text" id="sifreSifirlamaKodu" placeholder="ADMIN-RESET-2024"></div><div class="form-group"><label>Yeni Şifre</label><input type="password" id="yeniSifreSifirla"></div><button class="btn btn-warning" onclick="sifreSifirla()">SIFIRLA</button><button onclick="modalKapat('sifreUnuttumModal')">İPTAL</button></div></div>
+<div class="modal" id="kurtarmaModal"><div class="modal-content"><h3>🗝️ KURTARMA KODU</h3><p style="font-size:13px;color:#64748b;">Şifrenizi unutursanız bu kodla yeni şifre belirleyebilirsiniz. <b>Kâğıda yazın ve kasadan uzakta saklayın</b> — bir daha gösterilmeyecek.</p><div id="kurtarmaKoduGoster" style="font-family:monospace;font-size:26px;font-weight:800;letter-spacing:2px;text-align:center;padding:14px;margin:12px 0;border:2px dashed #f59e0b;border-radius:12px;user-select:all;"></div><button class="btn" onclick="modalKapat('kurtarmaModal')">YAZDIM, KAPAT</button></div></div>
+
+<div class="modal" id="sifreDegistirModal"><div class="modal-content"><h3>🔑 ŞİFRE DEĞİŞTİR</h3><div id="sifreDegistirNot" style="font-size:13px;color:#b45309;margin-bottom:8px;"></div><div class="form-group"><label>Mevcut Şifre</label><input type="password" id="eskiSifre"></div><div class="form-group"><label>Yeni Şifre</label><input type="password" id="yeniSifre"></div><div class="form-group"><label>Yeni Şifre (Tekrar)</label><input type="password" id="yeniSifreTekrar"></div><button class="btn" onclick="sifreDegistir()">DEĞİŞTİR</button><button onclick="modalKapat('sifreDegistirModal')">İPTAL</button></div></div>
+
+<div class="modal" id="sifreUnuttumModal"><div class="modal-content"><h3>❓ ŞİFRE SIFIRLAMA</h3><div class="form-group"><label>Kurtarma Kodu</label><input type="text" id="sifreSifirlamaKodu" placeholder="XXXX-XXXX-XXXX" autocomplete="off"></div><div class="form-group"><label>Yeni Şifre</label><input type="password" id="yeniSifreSifirla"></div><button class="btn btn-warning" onclick="sifreSifirla()">SIFIRLA</button><button onclick="modalKapat('sifreUnuttumModal')">İPTAL</button></div></div>
 
 <div class="modal" id="zRaporuModal"><div class="modal-content" style="width:95%;max-width:560px;">
     <h3>📊 Z RAPORU</h3>
@@ -515,8 +519,62 @@
 </div></div>
 
 <script>
+/* ---- Depo: where the shop's data is kept ----
+   IndexedDB: far larger than localStorage (which fills up at about 5–10 MB of sales), and the browser is asked to
+   keep it ("persistent storage") so it is not cleared to free space. Everything is read into memory before the
+   program starts, so the program reads it at once (Depo.getItem); every change is written straight away
+   (Depo.setItem). The first time, the data in localStorage is moved over and removed there only after it has been
+   read back correctly. Without IndexedDB (e.g. a private window) localStorage is used as before. */
+(function () {
+  const mem = new Map(), DB_AD = 'tekel-kasa', ST = 'kv';
+  let db = null, yedekLS = false, bekleyen = new Map(), plan = false;
+  const ac = () => new Promise((res, rej) => { const r = indexedDB.open(DB_AD, 1); r.onupgradeneeded = () => r.result.createObjectStore(ST); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked')); });
+  const hepsi = d => new Promise((res, rej) => { const out = new Map(), tx = d.transaction(ST, 'readonly'), c = tx.objectStore(ST).openCursor(); c.onsuccess = () => { const k = c.result; if (k) { out.set(k.key, k.value); k.continue(); } }; tx.oncomplete = () => res(out); tx.onerror = () => rej(tx.error); });
+  const yaz = pairs => new Promise((res, rej) => { const tx = db.transaction(ST, 'readwrite'), s = tx.objectStore(ST); for (const [k, v] of pairs) { if (v == null) s.delete(k); else s.put(v, k); } tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
+  const hata = e => { console.error('Depo', e); if (window.toast) toast('❌ Veri kaydedilemedi! Hemen yedek alın.'); };
+  // the changes of one moment go out together in one write
+  const kaydet = (k, v) => {
+    if (yedekLS) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { hata(e); } return; }
+    bekleyen.set(k, v);
+    if (!plan) { plan = true; queueMicrotask(() => { plan = false; const p = [...bekleyen]; bekleyen = new Map(); yaz(p).catch(hata); }); }
+  };
+  window.Depo = {
+    getItem: k => mem.has(k) ? mem.get(k) : null,
+    setItem: (k, v) => { v = String(v); mem.set(k, v); kaydet(k, v); },
+    removeItem: k => { mem.delete(k); kaydet(k, null); },
+    clear: () => { const keys = [...mem.keys()]; mem.clear(); keys.forEach(k => kaydet(k, null)); },
+    get tur() { return yedekLS ? 'localStorage' : 'IndexedDB'; }
+  };
+  window.onReady = fn => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', fn) : fn();
+  async function basla() {
+    try {
+      db = await ac();
+      const mevcut = await hepsi(db);
+      if (!mevcut.size) {   // first start with IndexedDB: move the data over from localStorage
+        const tasi = [];
+        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^(tekel_|pos_)/.test(k)) tasi.push([k, localStorage.getItem(k)]); }
+        if (tasi.length) {
+          await yaz(tasi);
+          const kontrol = await hepsi(db);
+          if (tasi.every(([k, v]) => kontrol.get(k) === v)) tasi.forEach(([k]) => localStorage.removeItem(k));
+        }
+        tasi.forEach(([k, v]) => mem.set(k, v));
+      } else mevcut.forEach((v, k) => mem.set(k, v));
+    } catch (e) {
+      console.warn('IndexedDB kullanılamıyor, localStorage kullanılıyor', e);
+      yedekLS = true; db = null;
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); mem.set(k, localStorage.getItem(k)); }
+    }
+    try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {}
+    // now the program itself
+    const s = document.createElement('script'); s.textContent = document.getElementById('anaKod').textContent; document.body.appendChild(s);
+  }
+  basla();
+})();
+</script>
+<script type="text/plain" id="anaKod">
 // ============ ANA DEĞİŞKENLER ============
-let adminSifreHash = btoa("2370");
+let adminSifreHash = null;   // veriYukle() fills it; null = no password yet (first start asks for one)
 let oturumGecerli = false;
 let oturumZamani = null;
 let bekleyenIslem = null;
@@ -549,22 +607,91 @@ document.addEventListener('click', function initAudio() {
 }, { once: true });
 
 // ============ ŞİFRE FONKSİYONLARI ============
-function sifreDogrula() {
+// The admin password is kept only as PBKDF2-SHA-256 ("v2:salt:hash") — it cannot be read back, and it never goes
+// into a backup file. When a password is set, a recovery code is shown once (kept the same way); with it a forgotten
+// password can be replaced. A password from the old version (base64) still works once and is converted at once.
+async function sifreTuret(pw, salt) {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(String(pw)), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode(salt), iterations: 150000, hash: 'SHA-256' }, key, 256);
+    return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function sifreHashle(pw) {
+    const salt = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+    return 'v2:' + salt + ':' + await sifreTuret(pw, salt);
+}
+async function sifreEslesir(pw, kayit) {
+    if (!kayit) return false;
+    if (String(kayit).startsWith('v2:')) { const [, salt, h] = String(kayit).split(':'); return (await sifreTuret(pw, salt)) === h; }
+    try { return btoa(String(pw)) === kayit; } catch (e) { return false; }   // the old version's form
+}
+// a new recovery code (shown once); the old one stops working
+async function kurtarmaKoduYeni() {
+    const harf = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(12));
+    let kod = ''; r.forEach((b, i) => { kod += harf[b % harf.length]; if (i === 3 || i === 7) kod += '-'; });
+    Depo.setItem('tekel_kurtarmaKodu', await sifreHashle(kod));
+    document.getElementById('kurtarmaKoduGoster').textContent = kod;
+    document.getElementById('kurtarmaModal').classList.add('open');
+}
+async function sifreDogrula() {
     let girilen = document.getElementById('adminSifre').value;
     let hatirla = document.getElementById('beniHatirla').checked;
-    if (btoa(girilen) === adminSifreHash) {
-        oturumGecerli = true;
-        if (hatirla) { oturumZamani = Date.now() + (30 * 60 * 1000); localStorage.setItem('pos_oturum', oturumZamani); }
-        toast('✅ Şifre doğrulandı!'); modalKapat('sifreModal');
-        document.getElementById('adminSifre').value = '';
-        if (bekleyenIslem) { bekleyenIslem(); bekleyenIslem = null; }
-    } else { toast('❌ Şifre yanlış!'); }
+    if (!(await sifreEslesir(girilen, adminSifreHash))) { toast('❌ Şifre yanlış!'); return; }
+    if (!String(adminSifreHash).startsWith('v2:')) { adminSifreHash = await sifreHashle(girilen); veriKaydet(); }   // the old form is replaced at once
+    oturumGecerli = true;
+    if (hatirla) { oturumZamani = Date.now() + (30 * 60 * 1000); Depo.setItem('pos_oturum', oturumZamani); }
+    toast('✅ Şifre doğrulandı!'); modalKapat('sifreModal');
+    document.getElementById('adminSifre').value = '';
+    if (bekleyenIslem) { bekleyenIslem(); bekleyenIslem = null; }
+    // the old built-in password (2370), or no recovery code yet: ask for a new password now
+    if (girilen === '2370' || !Depo.getItem('tekel_kurtarmaKodu')) {
+        document.getElementById('sifreDegistirNot').textContent = girilen === '2370'
+            ? '⚠️ Herkesin bildiği eski varsayılan şifreyi kullanıyorsunuz. Lütfen yeni bir şifre belirleyin.'
+            : '⚠️ Bu cihazda kurtarma kodu yok. Şifreyi bir kez değiştirin; size bir kurtarma kodu verilecek.';
+        document.getElementById('eskiSifre').value = girilen;
+        document.getElementById('sifreDegistirModal').classList.add('open');
+    }
+}
+// first start: there is no password yet, the owner sets one
+async function ilkSifreKaydet() {
+    let a = document.getElementById('ilkSifre').value, b = document.getElementById('ilkSifreTekrar').value;
+    if (a.length < 4) { toast('❌ En az 4 karakter!'); return; }
+    if (a !== b) { toast('❌ Şifreler uyuşmuyor!'); return; }
+    adminSifreHash = await sifreHashle(a); veriKaydet();
+    oturumGecerli = true;
+    document.getElementById('ilkSifre').value = ''; document.getElementById('ilkSifreTekrar').value = '';
+    modalKapat('ilkSifreModal'); toast('✅ Yönetici şifresi belirlendi!');
+    await kurtarmaKoduYeni();
+    if (bekleyenIslem) { bekleyenIslem(); bekleyenIslem = null; }
 }
 function sifreUnuttumModalAc() { modalKapat('sifreModal'); document.getElementById('sifreUnuttumModal').classList.add('open'); }
-function sifreSifirla() { let kod = document.getElementById('sifreSifirlamaKodu').value; let yeni = document.getElementById('yeniSifreSifirla').value; if (kod === 'ADMIN-RESET-2024') { if (!yeni || yeni.length < 3) { toast('❌ En az 3 karakter!'); return; } adminSifreHash = btoa(yeni); toast('✅ Şifre sıfırlandı!'); modalKapat('sifreUnuttumModal'); localStorage.removeItem('pos_oturum'); oturumGecerli = false; } else { toast('❌ Kod yanlış!'); } }
-function sifreDegistir() { let eski = document.getElementById('eskiSifre').value; let yeni = document.getElementById('yeniSifre').value; let tekrar = document.getElementById('yeniSifreTekrar').value; if (btoa(eski) !== adminSifreHash) { toast('❌ Mevcut şifre yanlış!'); return; } if (yeni !== tekrar) { toast('❌ Şifreler uyuşmuyor!'); return; } if (yeni.length < 3) { toast('❌ En az 3 karakter!'); return; } adminSifreHash = btoa(yeni); toast('✅ Şifre değiştirildi!'); modalKapat('sifreDegistirModal'); localStorage.removeItem('pos_oturum'); oturumGecerli = false; }
-function oturumKontrolEt() { let kayit = localStorage.getItem('pos_oturum'); if (kayit && Date.now() < parseInt(kayit)) { oturumGecerli = true; return true; } return false; }
-function sifreIleKorunanIslem(cb) { if (oturumGecerli || oturumKontrolEt()) { cb(); } else { bekleyenIslem = cb; document.getElementById('sifreModal').classList.add('open'); } }
+// forgotten password: the recovery code that was shown when the password was set
+async function sifreSifirla() {
+    let kod = document.getElementById('sifreSifirlamaKodu').value.trim().toUpperCase().replace(/\s+/g, '');
+    let yeni = document.getElementById('yeniSifreSifirla').value;
+    let kayit = Depo.getItem('tekel_kurtarmaKodu');
+    if (!kayit) { toast('❌ Bu cihazda kurtarma kodu yok'); return; }
+    if (!(await sifreEslesir(kod, kayit))) { toast('❌ Kurtarma kodu yanlış!'); return; }
+    if (!yeni || yeni.length < 4) { toast('❌ En az 4 karakter!'); return; }
+    adminSifreHash = await sifreHashle(yeni); veriKaydet();
+    document.getElementById('sifreSifirlamaKodu').value = ''; document.getElementById('yeniSifreSifirla').value = '';
+    toast('✅ Şifre sıfırlandı!'); modalKapat('sifreUnuttumModal'); Depo.removeItem('pos_oturum'); oturumGecerli = false;
+    await kurtarmaKoduYeni();   // the code has been used: a new one
+}
+async function sifreDegistir() {
+    let eski = document.getElementById('eskiSifre').value; let yeni = document.getElementById('yeniSifre').value; let tekrar = document.getElementById('yeniSifreTekrar').value;
+    if (!(await sifreEslesir(eski, adminSifreHash))) { toast('❌ Mevcut şifre yanlış!'); return; }
+    if (yeni !== tekrar) { toast('❌ Şifreler uyuşmuyor!'); return; }
+    if (yeni.length < 4) { toast('❌ En az 4 karakter!'); return; }
+    if (yeni === '2370') { toast('❌ Bu şifre herkesçe biliniyor, başka bir şifre seçin!'); return; }
+    adminSifreHash = await sifreHashle(yeni); veriKaydet();
+    ['eskiSifre', 'yeniSifre', 'yeniSifreTekrar'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('sifreDegistirNot').textContent = '';
+    toast('✅ Şifre değiştirildi!'); modalKapat('sifreDegistirModal'); Depo.removeItem('pos_oturum'); oturumGecerli = false;
+    await kurtarmaKoduYeni();
+}
+function oturumKontrolEt() { let kayit = Depo.getItem('pos_oturum'); if (kayit && Date.now() < parseInt(kayit)) { oturumGecerli = true; return true; } return false; }
+function sifreIleKorunanIslem(cb) { if (oturumGecerli || oturumKontrolEt()) { cb(); } else if (!adminSifreHash) { bekleyenIslem = cb; document.getElementById('ilkSifreModal').classList.add('open'); } else { bekleyenIslem = cb; document.getElementById('sifreModal').classList.add('open'); } }
 function sifreEnter(e) { if (e.key === 'Enter') sifreDogrula(); }
 
 // ============ SESLİ KOMUT ============
@@ -606,37 +733,37 @@ function konus(metin) { let u = new SpeechSynthesisUtterance(metin); u.lang = 't
 
 // ============ VERİ YÖNETİMİ ============
 function veriKaydet() { 
-    localStorage.setItem('tekel_kategoriler', JSON.stringify(kategoriler)); 
-    localStorage.setItem('tekel_urunler', JSON.stringify(urunler)); 
-    localStorage.setItem('tekel_satislar', JSON.stringify(satislar)); 
-    localStorage.setItem('tekel_musteriler', JSON.stringify(musteriler)); 
-    localStorage.setItem('tekel_nextId', nextId); 
-    localStorage.setItem('tekel_vardiyalar', JSON.stringify(vardiyalar)); 
-    localStorage.setItem('tekel_aktifVardiya', JSON.stringify(aktifVardiya)); 
-    localStorage.setItem('tekel_adminSifre', adminSifreHash); 
-    localStorage.setItem('tekel_kampanyalar', JSON.stringify(kampanyalar));
-    localStorage.setItem('tekel_tedarikciler', JSON.stringify(tedarikciler));
-    localStorage.setItem('tekel_faturalar', JSON.stringify(faturalar));
+    Depo.setItem('tekel_kategoriler', JSON.stringify(kategoriler)); 
+    Depo.setItem('tekel_urunler', JSON.stringify(urunler)); 
+    Depo.setItem('tekel_satislar', JSON.stringify(satislar)); 
+    Depo.setItem('tekel_musteriler', JSON.stringify(musteriler)); 
+    Depo.setItem('tekel_nextId', nextId); 
+    Depo.setItem('tekel_vardiyalar', JSON.stringify(vardiyalar)); 
+    Depo.setItem('tekel_aktifVardiya', JSON.stringify(aktifVardiya)); 
+    if (adminSifreHash) Depo.setItem('tekel_adminSifre', adminSifreHash); 
+    Depo.setItem('tekel_kampanyalar', JSON.stringify(kampanyalar));
+    Depo.setItem('tekel_tedarikciler', JSON.stringify(tedarikciler));
+    Depo.setItem('tekel_faturalar', JSON.stringify(faturalar));
 }
 function veriYukle() { 
-    let k = localStorage.getItem('tekel_kategoriler'); if (k) kategoriler = JSON.parse(k); 
-    let u = localStorage.getItem('tekel_urunler'); if (u) { urunler = JSON.parse(u); nextId = Math.max(...urunler.map(x=>x.id), 0) + 1; } 
-    let s = localStorage.getItem('tekel_satislar'); if (s) { satislar = JSON.parse(s); satislar = satislar.map(x=>({...x, tarih: new Date(x.tarih)})); } 
-    let m = localStorage.getItem('tekel_musteriler'); if (m) musteriler = JSON.parse(m); 
-    let v = localStorage.getItem('tekel_vardiyalar'); if (v) vardiyalar = JSON.parse(v); 
-    let av = localStorage.getItem('tekel_aktifVardiya'); if (av) aktifVardiya = JSON.parse(av); 
-    let sifre = localStorage.getItem('tekel_adminSifre'); if (sifre) adminSifreHash = sifre;
-    let kamp = localStorage.getItem('tekel_kampanyalar'); if (kamp) kampanyalar = JSON.parse(kamp);
-    let t = localStorage.getItem('tekel_tedarikciler'); if (t) tedarikciler = JSON.parse(t);
-    let f = localStorage.getItem('tekel_faturalar'); if (f) faturalar = JSON.parse(f);
+    let k = Depo.getItem('tekel_kategoriler'); if (k) kategoriler = JSON.parse(k); 
+    let u = Depo.getItem('tekel_urunler'); if (u) { urunler = JSON.parse(u); nextId = Math.max(...urunler.map(x=>x.id), 0) + 1; } 
+    let s = Depo.getItem('tekel_satislar'); if (s) { satislar = JSON.parse(s); satislar = satislar.map(x=>({...x, tarih: new Date(x.tarih)})); } 
+    let m = Depo.getItem('tekel_musteriler'); if (m) musteriler = JSON.parse(m); 
+    let v = Depo.getItem('tekel_vardiyalar'); if (v) vardiyalar = JSON.parse(v); 
+    let av = Depo.getItem('tekel_aktifVardiya'); if (av) aktifVardiya = JSON.parse(av); 
+    let sifre = Depo.getItem('tekel_adminSifre'); if (sifre) adminSifreHash = sifre;
+    let kamp = Depo.getItem('tekel_kampanyalar'); if (kamp) kampanyalar = JSON.parse(kamp);
+    let t = Depo.getItem('tekel_tedarikciler'); if (t) tedarikciler = JSON.parse(t);
+    let f = Depo.getItem('tekel_faturalar'); if (f) faturalar = JSON.parse(f);
 }
 
 // ============ YEDEKLEME ============
-function yedekAl() { const yedek = { version: "6.0", type: "tekel_pos_backup", kategoriler, urunler, satislar: satislar.map(s => ({...s, tarih: s.tarih.toISOString()})), musteriler, nextId, vardiyalar, kampanyalar, tedarikciler, faturalar, adminSifre: adminSifreHash }; const dataStr = JSON.stringify(yedek, null, 2); const a = document.createElement('a'); a.download = `tekel_backup_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.tekelbackup`; a.href = URL.createObjectURL(new Blob([dataStr], {type: 'application/octet-stream'})); a.click(); URL.revokeObjectURL(a.href); toast('✅ Yedek alindi!'); }
+function yedekAl() { const yedek = { version: "6.0", type: "tekel_pos_backup", kategoriler, urunler, satislar: satislar.map(s => ({...s, tarih: s.tarih.toISOString()})), musteriler, nextId, vardiyalar, kampanyalar, tedarikciler, faturalar }; const dataStr = JSON.stringify(yedek, null, 2); const a = document.createElement('a'); a.download = `tekel_backup_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.tekelbackup`; a.href = URL.createObjectURL(new Blob([dataStr], {type: 'application/octet-stream'})); a.click(); URL.revokeObjectURL(a.href); toast('✅ Yedek alindi!'); }
 function yedekDosyaSec() { document.getElementById('yedekDosyaInput').click(); }
-function yedekDosyasindanYukle(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { const y = JSON.parse(e.target.result); if (y.type !== "tekel_pos_backup") { toast('❌ Geçersiz yedek!'); return; } if (y.urunler) urunler = y.urunler; if (y.kategoriler) kategoriler = y.kategoriler; if (y.satislar) satislar = y.satislar.map(s => ({...s, tarih: new Date(s.tarih)})); if (y.tedarikciler) tedarikciler = y.tedarikciler; if (y.faturalar) faturalar = y.faturalar; if (y.adminSifre) adminSifreHash = y.adminSifre; veriKaydet(); tumRender(); toast('✅ Yedek yüklendi!'); } catch(e) { toast('❌ Hatalı dosya!'); } }; reader.readAsText(file); }
+function yedekDosyasindanYukle(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { const y = JSON.parse(e.target.result); if (y.type !== "tekel_pos_backup") { toast('❌ Geçersiz yedek!'); return; } if (y.urunler) urunler = y.urunler; if (y.kategoriler) kategoriler = y.kategoriler; if (y.satislar) satislar = y.satislar.map(s => ({...s, tarih: new Date(s.tarih)})); if (y.tedarikciler) tedarikciler = y.tedarikciler; if (y.faturalar) faturalar = y.faturalar; veriKaydet(); tumRender(); toast('✅ Yedek yüklendi!'); } catch(e) { toast('❌ Hatalı dosya!'); } }; reader.readAsText(file); }
 function programiKapat() { sifreIleKorunanIslem(() => { if (confirm('Programi kapat?')) { toast('👋 Kapatiliyor...'); setTimeout(() => window.close(), 500); } }); }
-function kasayiSifirla() { sifreIleKorunanIslem(() => { if (confirm('TÜM VERİLER SİLİNECEK! Onayliyor musunuz?')) { localStorage.clear(); toast('🗑️ Sifirlandi!'); setTimeout(() => location.reload(), 1500); } }); }
+function kasayiSifirla() { sifreIleKorunanIslem(() => { if (confirm('TÜM VERİLER SİLİNECEK! Onayliyor musunuz?')) { Depo.clear(); toast('🗑️ Sifirlandi!'); setTimeout(() => location.reload(), 1500); } }); }
 
 // ============ DASHBOARD ============
 function dashboardAc() {
@@ -802,7 +929,7 @@ function aramaSecEkle(id) {
 }
 
 // Klavye navigasyonu — barkod input'una bağla
-document.addEventListener('DOMContentLoaded', () => {
+onReady(() => {
     document.getElementById('barkod').addEventListener('keydown', function(e) {
         let res = document.getElementById('searchResults');
         if (res.style.display === 'none') return;
@@ -957,7 +1084,7 @@ function iadeModalAc() {
     };
     oturumGecerli = false; // her açılışta şifre zorunlu
     document.getElementById('adminSifre').value = '';
-    document.getElementById('sifreModal').classList.add('open');
+    document.getElementById(adminSifreHash ? 'sifreModal' : 'ilkSifreModal').classList.add('open');
 }
 
 function iadeAramaYapListe() { 
@@ -996,7 +1123,7 @@ function iadeOnayla(idx) {
     };
     oturumGecerli = false;
     document.getElementById('adminSifre').value = '';
-    document.getElementById('sifreModal').classList.add('open');
+    document.getElementById(adminSifreHash ? 'sifreModal' : 'ilkSifreModal').classList.add('open');
 }
 
 function iadeFisiGoster(s) {
@@ -1208,7 +1335,7 @@ function urunDuzenleKaydet() {
 }
 
 // ============ STOK EŞİK AYARI ============
-let stokKritikEsik = parseInt(localStorage.getItem('tekel_stokEsik')) || 10;
+let stokKritikEsik = parseInt(Depo.getItem('tekel_stokEsik')) || 10;
 
 // ============ GÖRSEL YÜKLEME ============
 function gorselDosyaSec(prefix) { document.getElementById(prefix + 'ResimDosya').click(); }
@@ -1270,8 +1397,8 @@ async function dovizKurGuncelle() {
         dovizKurlar.EUR = 1 / data.rates.EUR;
         dovizKurlar.GBP = 1 / data.rates.GBP;
         dovizSonGuncelleme = new Date();
-        localStorage.setItem('tekel_dovizKurlar', JSON.stringify(dovizKurlar));
-        localStorage.setItem('tekel_dovizTarih', dovizSonGuncelleme.toISOString());
+        Depo.setItem('tekel_dovizKurlar', JSON.stringify(dovizKurlar));
+        Depo.setItem('tekel_dovizTarih', dovizSonGuncelleme.toISOString());
         dovizKurlarGoster();
         toast('✅ Döviz kurları güncellendi');
     } catch(e) {
@@ -1283,8 +1410,8 @@ async function dovizKurGuncelle() {
             dovizKurlar.EUR = data2.rates.TRY / data2.rates.EUR;
             dovizKurlar.GBP = data2.rates.TRY / data2.rates.GBP;
             dovizSonGuncelleme = new Date();
-            localStorage.setItem('tekel_dovizKurlar', JSON.stringify(dovizKurlar));
-            localStorage.setItem('tekel_dovizTarih', dovizSonGuncelleme.toISOString());
+            Depo.setItem('tekel_dovizKurlar', JSON.stringify(dovizKurlar));
+            Depo.setItem('tekel_dovizTarih', dovizSonGuncelleme.toISOString());
             dovizKurlarGoster();
             toast('✅ Döviz kurları güncellendi');
         } catch(e2) {
@@ -1295,8 +1422,8 @@ async function dovizKurGuncelle() {
 }
 
 function dovizKurlarYukle() {
-    let kayitli = localStorage.getItem('tekel_dovizKurlar');
-    let tarih = localStorage.getItem('tekel_dovizTarih');
+    let kayitli = Depo.getItem('tekel_dovizKurlar');
+    let tarih = Depo.getItem('tekel_dovizTarih');
     if (kayitli) {
         dovizKurlar = JSON.parse(kayitli);
         if (tarih) dovizSonGuncelleme = new Date(tarih);
@@ -1381,10 +1508,10 @@ function urunAySatisi(urunAd) {
 let otoYedekTimer = null;
 
 function otomatikYedekKontrol() {
-    let aktif = localStorage.getItem('tekel_otoYedekAktif');
+    let aktif = Depo.getItem('tekel_otoYedekAktif');
     if (aktif === 'hayir') return; // Kullanıcı kapattıysa çalıştırma
-    let sonYedek = localStorage.getItem('tekel_sonYedekTarih');
-    let aralik = parseInt(localStorage.getItem('tekel_otoYedekAralik')) || 24; // saat
+    let sonYedek = Depo.getItem('tekel_sonYedekTarih');
+    let aralik = parseInt(Depo.getItem('tekel_otoYedekAralik')) || 24; // saat
     let simdi = Date.now();
     let aralikMs = aralik * 60 * 60 * 1000;
     if (!sonYedek || (simdi - parseInt(sonYedek)) > aralikMs) {
@@ -1393,10 +1520,10 @@ function otomatikYedekKontrol() {
     // Periyodik kontrol: her saat kontrol et
     if (otoYedekTimer) clearInterval(otoYedekTimer);
     otoYedekTimer = setInterval(() => {
-        let aktifMi = localStorage.getItem('tekel_otoYedekAktif');
+        let aktifMi = Depo.getItem('tekel_otoYedekAktif');
         if (aktifMi === 'hayir') return;
-        let sy = localStorage.getItem('tekel_sonYedekTarih');
-        let ar = parseInt(localStorage.getItem('tekel_otoYedekAralik')) || 24;
+        let sy = Depo.getItem('tekel_sonYedekTarih');
+        let ar = parseInt(Depo.getItem('tekel_otoYedekAralik')) || 24;
         if (!sy || (Date.now() - parseInt(sy)) > ar * 3600000) {
             otomatikYedekAl(true);
         }
@@ -1409,7 +1536,7 @@ function otomatikYedekAl(sessiz) {
             version: "1.0", type: "tekel_pos_backup",
             kategoriler, urunler, musteriler, nextId, kampanyalar, tedarikciler, faturalar,
             satislar: satislar.map(s => ({...s, tarih: new Date(s.tarih).toISOString()})),
-            vardiyalar, adminSifre: adminSifreHash,
+            vardiyalar,
             tarih: new Date().toISOString()
         };
         let blob = new Blob([JSON.stringify(yedek, null, 2)], {type: 'application/json'});
@@ -1424,12 +1551,12 @@ function otomatikYedekAl(sessiz) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         let now = Date.now();
-        localStorage.setItem('tekel_sonYedekTarih', now.toString());
+        Depo.setItem('tekel_sonYedekTarih', now.toString());
         // Yedek geçmişini kaydet (son 10)
-        let gecmis = JSON.parse(localStorage.getItem('tekel_yedekGecmis') || '[]');
+        let gecmis = JSON.parse(Depo.getItem('tekel_yedekGecmis') || '[]');
         gecmis.unshift({ tarih: new Date().toISOString(), tip: sessiz ? 'otomatik' : 'manuel' });
         if (gecmis.length > 10) gecmis = gecmis.slice(0, 10);
-        localStorage.setItem('tekel_yedekGecmis', JSON.stringify(gecmis));
+        Depo.setItem('tekel_yedekGecmis', JSON.stringify(gecmis));
         if (!sessiz) toast('✅ Yedek alındı! (' + tarihStr + ')');
         else toast('💾 Oto yedek alındı (' + tarihStr + ')');
         // Oto yedek ayarları modalı açıksa güncelle
@@ -1447,10 +1574,10 @@ function otoYedekAyarAc() {
 }
 
 function otoYedekModalGuncelle() {
-    let aktif = localStorage.getItem('tekel_otoYedekAktif') !== 'hayir';
-    let aralik = parseInt(localStorage.getItem('tekel_otoYedekAralik')) || 24;
-    let sonYedek = localStorage.getItem('tekel_sonYedekTarih');
-    let gecmis = JSON.parse(localStorage.getItem('tekel_yedekGecmis') || '[]');
+    let aktif = Depo.getItem('tekel_otoYedekAktif') !== 'hayir';
+    let aralik = parseInt(Depo.getItem('tekel_otoYedekAralik')) || 24;
+    let sonYedek = Depo.getItem('tekel_sonYedekTarih');
+    let gecmis = JSON.parse(Depo.getItem('tekel_yedekGecmis') || '[]');
     let sonYedekStr = sonYedek
         ? new Date(parseInt(sonYedek)).toLocaleString('tr-TR')
         : 'Henüz yedek alınmadı';
@@ -1506,7 +1633,7 @@ function otoYedekModalGuncelle() {
 }
 
 function otoYedekAcKapat(ac) {
-    localStorage.setItem('tekel_otoYedekAktif', ac ? 'evet' : 'hayir');
+    Depo.setItem('tekel_otoYedekAktif', ac ? 'evet' : 'hayir');
     if (ac) otomatikYedekKontrol();
     else if (otoYedekTimer) { clearInterval(otoYedekTimer); otoYedekTimer = null; }
     toast(ac ? '✅ Oto yedek aktif edildi' : '⏹️ Oto yedek durduruldu');
@@ -1515,7 +1642,7 @@ function otoYedekAcKapat(ac) {
 
 function otoYedekKaydet() {
     let aralik = parseInt(document.getElementById('otoYedekAralikSec').value);
-    localStorage.setItem('tekel_otoYedekAralik', aralik);
+    Depo.setItem('tekel_otoYedekAralik', aralik);
     toast(`✅ Yedek aralığı ${aralik} saat olarak ayarlandı`);
     otoYedekModalGuncelle();
     otomatikYedekKontrol();
@@ -1524,7 +1651,7 @@ function stokEsikAyarla() {
     let yeni = prompt(`Stok kritik eşik (şu an: ${stokKritikEsik}):`, stokKritikEsik);
     if (yeni && !isNaN(yeni)) {
         stokKritikEsik = parseInt(yeni);
-        localStorage.setItem('tekel_stokEsik', stokKritikEsik);
+        Depo.setItem('tekel_stokEsik', stokKritikEsik);
         kritikStokKontrol();
         toast(`✅ Kritik stok eşiği: ${stokKritikEsik} adet`);
     }
@@ -1817,8 +1944,8 @@ function adminPanelAc() { sifreIleKorunanIslem(() => { sayfaGoster('admin'); adm
 function adminPanelAcMobil() { adminPanelAc(); sayfaGosterMobil('admin'); }
 function adminGridGoster() {
     // Oto yedek durum bandını güncelle
-    let aktif = localStorage.getItem('tekel_otoYedekAktif') !== 'hayir';
-    let sonYedek = localStorage.getItem('tekel_sonYedekTarih');
+    let aktif = Depo.getItem('tekel_otoYedekAktif') !== 'hayir';
+    let sonYedek = Depo.getItem('tekel_sonYedekTarih');
     let sonYedekStr = sonYedek ? new Date(parseInt(sonYedek)).toLocaleString('tr-TR') : 'Henüz alınmadı';
     let durumEl = document.getElementById('otoYedekDurumText');
     if (durumEl) durumEl.innerHTML = aktif
@@ -1831,7 +1958,7 @@ function adminGridGoster() {
     <div class="admin-card" onclick="kategoriYonetimiAc()"><i class="ti ti-category"></i><div>KATEGORİ</div></div>
     <div class="admin-card" onclick="urunEkleModalAc()" style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-color:#10b981;"><i class="ti ti-plus" style="color:#10b981;"></i><div style="color:#065f46;font-weight:800;">YENİ ÜRÜN</div></div>
     <div class="admin-card" onclick="kasiyerRaporuAc()" style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border-color:#3b82f6;"><i class="ti ti-users" style="color:#3b82f6;"></i><div style="color:#1e40af;font-weight:800;">KASİYER</div></div>
-    <div class="admin-card" onclick="iadeModalAc()" style="background:linear-gradient(135deg,#fff1f2,#fee2e2);border-color:#ef4444;"><i class="ti ti-rotate-left" style="color:#ef4444;"></i><div style="color:#991b1b;font-weight:800;">İADE</div></div>
+    <div class="admin-card" onclick="iadeModalAc()" style="background:linear-gradient(135deg,#fff1f2,#fee2e2);border-color:#ef4444;"><i class="ti ti-rotate" style="color:#ef4444;"></i><div style="color:#991b1b;font-weight:800;">İADE</div></div>
     <div class="admin-card" onclick="musteriBorc()"><i class="ti ti-credit-card"></i><div>MÜŞTERİ BORÇ</div></div>
     <div class="admin-card" onclick="tedarikciYonetimiAc()"><i class="ti ti-truck"></i><div>TEDARİKÇİ</div></div>
     <div class="admin-card" onclick="raporlarAc()"><i class="ti ti-chart-bar"></i><div>RAPORLAR</div></div>
@@ -1857,7 +1984,7 @@ let pwaPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); pwaPrompt = e; });
 const manifest = { name: "Tekel Kasa", short_name: "Tekel Kasa", start_url: "./", display: "standalone", theme_color: "#1e293b", background_color: "#1e293b", icons: [{ src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='#3b82f6'/><text x='50' y='70' text-anchor='middle' fill='white' font-size='60'>🏪</text></svg>", sizes: "192x192", type: "image/svg+xml" }] };
 document.getElementById('pwaManifest')?.setAttribute('href', URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type:'application/json'})));
-if('serviceWorker' in navigator) { navigator.serviceWorker.register(URL.createObjectURL(new Blob([`self.addEventListener('install',e=>e.waitUntil(caches.open('tekel-v6').then(c=>c.addAll(['./',location.href])))); self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`], {type:'application/javascript'}))).catch(()=>{}); }
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(e => console.warn('Çevrimdışı destek kurulamadı', e)); }
 
 // ============ KAMERA BARKOD OKUMA (BarcodeDetector API) ============
 // ============ KAMERA BARKOD OKUYUCU (html5-qrcode tabanlı) ============
@@ -1989,7 +2116,7 @@ function iadeFisiYazdir() {
 }
 
 // ============ MÜŞTERİ BORÇ TAKİBİ ============
-let musteriBorc_data = JSON.parse(localStorage.getItem('tekel_musteriBorc') || '[]');
+let musteriBorc_data = JSON.parse(Depo.getItem('tekel_musteriBorc') || '[]');
 
 function musteriBorc() {
     musteriBorcRender();
@@ -2005,7 +2132,7 @@ function borcEkle() {
         id: Date.now(), musteriAd: ad, miktar, aciklama,
         tarih: new Date().toISOString(), odendi: false
     });
-    localStorage.setItem('tekel_musteriBorc', JSON.stringify(musteriBorc_data));
+    Depo.setItem('tekel_musteriBorc', JSON.stringify(musteriBorc_data));
     document.getElementById('borcMusteriAd').value = '';
     document.getElementById('borcMiktar').value = '';
     document.getElementById('borcAciklama').value = '';
@@ -2016,7 +2143,7 @@ function borcEkle() {
 function borcOde(id) {
     let b = musteriBorc_data.find(x => x.id === id);
     if (b) { b.odendi = true; b.odemeTarihi = new Date().toISOString(); }
-    localStorage.setItem('tekel_musteriBorc', JSON.stringify(musteriBorc_data));
+    Depo.setItem('tekel_musteriBorc', JSON.stringify(musteriBorc_data));
     musteriBorcRender();
     toast('✅ Borç ödendi olarak işaretlendi');
 }
@@ -2024,7 +2151,7 @@ function borcOde(id) {
 function borcSil(id) {
     if (!confirm('Bu borç kaydı silinsin mi?')) return;
     musteriBorc_data = musteriBorc_data.filter(x => x.id !== id);
-    localStorage.setItem('tekel_musteriBorc', JSON.stringify(musteriBorc_data));
+    Depo.setItem('tekel_musteriBorc', JSON.stringify(musteriBorc_data));
     musteriBorcRender();
 }
 
