@@ -235,6 +235,7 @@
         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
             <button id="voiceBtn" class="voice-toggle" onclick="sesliKomutToggle()">🎤 SES</button>
             <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙</button>
+            <button id="yukleBtn" class="voice-toggle" onclick="uygulamaYukle()" style="display:none;" title="Uygulama olarak yükle">📲 YÜKLE</button>
             <div id="vardiyaBilgiTopbar" style="background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:20px;font-size:10px;">⚠️ Vardiya yok</div>
             <div class="date-time" id="dateTime"></div>
         </div>
@@ -553,6 +554,16 @@
     get tur() { return yedekLS ? 'localStorage' : 'IndexedDB'; }
   };
   window.onReady = fn => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', fn) : fn();
+  // install as an app: Chrome offers it once the page qualifies (caught here, early, before the program starts);
+  // the 📲 button in the top bar shows then
+  let kurulum = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); kurulum = e; const b = document.getElementById('yukleBtn'); if (b) b.style.display = ''; });
+  window.addEventListener('appinstalled', () => { kurulum = null; const b = document.getElementById('yukleBtn'); if (b) b.style.display = 'none'; if (window.toast) toast('✅ TEKEL KASA uygulama olarak yüklendi'); });
+  window.uygulamaYukle = async () => {
+    if (!kurulum) { alert('Tarayıcı yüklemeyi şu an sunmuyor. Chrome menüsü (⋮) → Kaydet ve paylaş → Sayfayı uygulama olarak yükle.'); return; }
+    kurulum.prompt(); try { await kurulum.userChoice; } catch (e) {}
+    kurulum = null; document.getElementById('yukleBtn').style.display = 'none';
+  };
   async function basla() {
     try {
       db = await ac();
@@ -1987,8 +1998,6 @@ function toast(msg) { let t=document.getElementById('toast'); t.textContent=msg;
 function modalKapat(id) { document.getElementById(id).classList.remove('open'); }
 
 // ============ PWA ============
-let pwaPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); pwaPrompt = e; });
 const manifest = { name: "Tekel Kasa", short_name: "Tekel Kasa", start_url: "./", display: "standalone", theme_color: "#1e293b", background_color: "#1e293b", icons: [{ src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='#3b82f6'/><text x='50' y='70' text-anchor='middle' fill='white' font-size='60'>🏪</text></svg>", sizes: "192x192", type: "image/svg+xml" }] };
 document.getElementById('pwaManifest')?.setAttribute('href', URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type:'application/json'})));
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(e => console.warn('Çevrimdışı destek kurulamadı', e)); }
