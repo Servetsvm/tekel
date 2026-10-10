@@ -2,10 +2,15 @@
 // otherwise from the cache. The libraries (charts, barcode camera, icons): from the cache, renewed in the background.
 // Exchange rates are never cached here (the program keeps the last rates itself).
 // Change SURUM with every update of the files below.
-const SURUM = 'tekel-v7';
+const SURUM = 'tekel-v8';
 const ONBELLEK = [
   './',
   './index.html',
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-512-maskable.png',
+  './icons/apple-touch-icon.png',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
   'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css'
